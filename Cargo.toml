@@ -1,0 +1,6 @@
+[workspace]
+members = ["crates/rexdk", "crates/rexgen"]
+resolver = "3"
+
+[workspace.dependencies]
+anyhow = "1.0"
