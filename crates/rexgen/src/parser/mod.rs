@@ -1,11 +1,24 @@
+use crate::ir::Ir;
 use crate::ir::method::Method;
 use crate::ir::schema::{AdditionalProperties, Schema, SchemaKind};
+use crate::spec::description::ApiDescription;
 use crate::{ir::field::Field, spec::method::ApiMethod};
 
-#[derive(Debug)]
-pub enum ParseError {
-    UnknownSchemaKind,
-    InvalidSchema,
+mod error;
+
+use error::ParseError;
+
+impl TryFrom<&ApiDescription> for Ir {
+    type Error = ParseError;
+    fn try_from(value: &ApiDescription) -> Result<Self, Self::Error> {
+        let endpoints = value.http.clone();
+        let methods = value
+            .methods
+            .iter()
+            .map(|m| Method::try_from(m).unwrap())
+            .collect();
+        Ok(Self { endpoints, methods })
+    }
 }
 
 impl TryFrom<&ApiMethod> for Method {
