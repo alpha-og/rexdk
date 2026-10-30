@@ -1,8 +1,6 @@
 use std::{fs::File, io::Read, path::Path};
 
-use anyhow::Result;
-
-use crate::spec::description::ApiDescription;
+use crate::{ir::Ir, spec::description::ApiDescription};
 
 mod generator;
 mod ir;
@@ -15,7 +13,7 @@ const API_SPEC_FILENAME: &str = "rex-api";
 const API_GENERATED_DIRECTORY: &str = "rexdk/src";
 const API_GENERATED_FILENAME: &str = "generated";
 
-fn main() -> Result<()> {
+fn main() -> anyhow::Result<()> {
     let api_spec_filepath_raw = format!("./{API_DIRECTORY}/{API_SPEC_FILENAME}.json");
     let api_spec_filepath = Path::new(&api_spec_filepath_raw);
 
@@ -25,7 +23,8 @@ fn main() -> Result<()> {
     api_spec_file.read_to_string(&mut raw_api_spec)?;
 
     let api_spec: ApiDescription = serde_json::from_str(&raw_api_spec)?;
-    let _generated_code = generate(&api_spec);
+    let ir = Ir::try_from(&api_spec)?;
+    dbg!(ir);
 
     let _api_generated_filepath_raw =
         format!("./{API_GENERATED_DIRECTORY}/{API_GENERATED_FILENAME}.rs");
@@ -34,11 +33,4 @@ fn main() -> Result<()> {
     // let generated_file = File::create_new(api_generated_filepath)?;
 
     Ok(())
-}
-
-fn generate(api_spec: &ApiDescription) {
-    api_spec.methods.iter().for_each(|method| {
-        let method = ir::method::Method::try_from(method).unwrap();
-        dbg!(method);
-    });
 }
