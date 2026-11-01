@@ -37,6 +37,7 @@ impl TryFrom<&ApiMethod> for Method {
         Ok(Self {
             name: api_method.name.clone(),
             description: api_method.description.clone(),
+            rpc_method: api_method.invoke.method.clone(),
             input_schema,
             output_schema,
         })
