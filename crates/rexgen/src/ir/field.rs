@@ -1,6 +1,6 @@
 use crate::ir::schema;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Field {
     pub name: String,
     pub schema: schema::Schema,

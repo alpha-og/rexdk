@@ -1,6 +1,6 @@
 use crate::ir::schema::Schema;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Method {
     pub name: String,
     pub description: String,

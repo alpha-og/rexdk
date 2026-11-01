@@ -1,13 +1,13 @@
 use crate::ir::field;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Schema {
     pub description: Option<String>,
     pub schema_kind: SchemaKind,
     pub nullable: bool,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum SchemaKind {
     String,
     Integer,
@@ -30,7 +30,7 @@ pub enum SchemaKind {
     Unknown,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum AdditionalProperties {
     Disallowed,
     Allowed,
