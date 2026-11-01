@@ -24,13 +24,20 @@ fn main() -> anyhow::Result<()> {
 
     let api_spec: ApiDescription = serde_json::from_str(&raw_api_spec)?;
     let ir = Ir::try_from(&api_spec)?;
-    dbg!(ir);
+    let mut generator = generator::rust::RustGenerator::new(ir);
+    let tokens = generator.generate_bindings();
+    let file = syn::parse2::<syn::File>(tokens).map_err(|e| {
+        eprintln!("Parse error: {}", e);
+        eprintln!("Span: {:?}", e.span());
+        e
+    })?;
+    let formatted = prettyplease::unparse(&file);
 
-    let _api_generated_filepath_raw =
+    let api_generated_filepath_raw =
         format!("./{API_GENERATED_DIRECTORY}/{API_GENERATED_FILENAME}.rs");
-    let _api_generated_filepath = Path::new(&api_spec_filepath_raw);
-
-    // let generated_file = File::create_new(api_generated_filepath)?;
+    let api_generated_filepath = Path::new(&api_generated_filepath_raw);
+    dbg!(api_generated_filepath);
+    std::fs::write("generated.rs", formatted)?;
 
     Ok(())
 }
