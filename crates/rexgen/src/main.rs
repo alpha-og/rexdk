@@ -10,7 +10,7 @@ mod spec;
 const API_DIRECTORY: &str = "api";
 const API_SPEC_FILENAME: &str = "rex-api";
 
-const API_GENERATED_DIRECTORY: &str = "rexdk/src";
+const API_GENERATED_DIRECTORY: &str = "crates/rexdk/src";
 const API_GENERATED_FILENAME: &str = "generated";
 
 fn main() -> anyhow::Result<()> {
@@ -37,7 +37,7 @@ fn main() -> anyhow::Result<()> {
         format!("./{API_GENERATED_DIRECTORY}/{API_GENERATED_FILENAME}.rs");
     let api_generated_filepath = Path::new(&api_generated_filepath_raw);
     dbg!(api_generated_filepath);
-    std::fs::write("generated.rs", formatted)?;
+    std::fs::write(api_generated_filepath, formatted)?;
 
     Ok(())
 }
