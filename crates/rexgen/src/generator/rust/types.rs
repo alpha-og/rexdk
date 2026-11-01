@@ -100,6 +100,7 @@ impl RustGenerator {
 
                 let definition = quote! {
                     #description
+                    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
                     pub struct #name {
                         #(#fields,)*
                     }
