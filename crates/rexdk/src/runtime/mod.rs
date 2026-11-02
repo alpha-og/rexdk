@@ -46,7 +46,8 @@ impl RexClient {
         Self::handshake(&mut ws_stream).await?;
         let (writer, mut reader) = ws_stream.split();
 
-        let pending_requests = Arc::new(Mutex::new(HashMap::new()));
+        let pending_requests: Arc<Mutex<HashMap<String, Sender<Result<Value, RexError>>>>> =
+            Arc::new(Mutex::new(HashMap::new()));
         let pending = Arc::clone(&pending_requests);
 
         let client = Self {
