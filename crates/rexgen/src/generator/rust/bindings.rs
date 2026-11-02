@@ -2,27 +2,30 @@ use heck::{ToSnakeCase, ToUpperCamelCase};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
 
-use crate::{generator::rust::RustGenerator, ir::method::Method};
+use crate::{
+    generator::rust::{Generator, error::RustGenerateError},
+    ir::method::Method,
+};
 
-impl RustGenerator {
-    pub fn generate_bindings(&mut self) -> TokenStream {
+impl Generator {
+    pub fn generate_bindings(&mut self) -> Result<TokenStream, RustGenerateError> {
         let mut bindings = Vec::new();
 
         for i in 0..self.ir.methods.len() {
             let method = self.ir.methods[i].clone();
-            bindings.push(self.generate_binding(&method));
+            bindings.push(self.generate_binding(&method)?);
         }
 
         let ty_definitions = self.registry.get_all();
-        quote! {
+        Ok(quote! {
             use crate::runtime::{RexClient, RexError};
 
             #(#ty_definitions)*
 
             #(#bindings)*
-        }
+        })
     }
-    fn generate_binding(&mut self, method: &Method) -> TokenStream {
+    fn generate_binding(&mut self, method: &Method) -> Result<TokenStream, RustGenerateError> {
         let rpc_method = &method.rpc_method;
         let method_name = method.name.to_snake_case();
         let binding_name = Ident::new(&method_name, Span::call_site());
@@ -38,10 +41,18 @@ impl RustGenerator {
         let mut rpc_arg_ty = quote! {::<(),_>};
         let args: TokenStream = match &method.input_schema {
             Some(schema) => {
-                let ty: TokenStream = self.generate_type(&schema, input_ty_name);
+                let ty: TokenStream = self.generate_type(&schema, input_ty_name)?;
                 rpc_arg_name = quote! {Some(#arg_name)};
                 rpc_arg_ty = quote! {};
+
+                let serde_omit_nullable = if schema.nullable {
+                    quote! {#[serde(skip_serializing_if = "Option::is_none")]}
+                } else {
+                    quote! {}
+                };
+
                 quote! {
+                    #serde_omit_nullable
                     #arg_name: #ty
                 }
             }
@@ -52,7 +63,7 @@ impl RustGenerator {
         let output_ty_name = format_ident!("{output_ty_name}Output");
         let output_ty: TokenStream = match &method.output_schema {
             Some(schema) => {
-                let ty: TokenStream = self.generate_type(&schema, output_ty_name);
+                let ty: TokenStream = self.generate_type(&schema, output_ty_name)?;
                 quote! {
                     #ty
                 }
@@ -60,12 +71,11 @@ impl RustGenerator {
             None => quote! {()},
         };
 
-        quote! {
-
+        Ok(quote! {
             #[doc = #description]
             pub async fn #binding_name(client: RexClient, #args) -> Result<#output_ty, RexError> {
                 client.invoke #rpc_arg_ty(#rpc_method, #rpc_arg_name).await
             }
-        }
+        })
     }
 }

@@ -1,15 +1,18 @@
 use crate::{generator::rust::registry::TypeRegistry, ir::Ir};
 
 mod bindings;
+mod error;
 mod registry;
-mod types;
+pub mod types;
 
-pub struct RustGenerator {
+pub use error::RustGenerateError;
+
+pub struct Generator {
     ir: Ir,
     registry: TypeRegistry,
 }
 
-impl RustGenerator {
+impl Generator {
     pub fn new(ir: Ir) -> Self {
         Self {
             ir,
