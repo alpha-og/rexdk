@@ -96,11 +96,11 @@ fn get_schema_kind_from_str(
                 }
             });
             let min_items = match value.get("minItems") {
-                Some(min_items) => min_items.as_i64().take(),
+                Some(min_items) => min_items.as_u64(),
                 _ => None,
             };
             let max_items = match value.get("maxItems") {
-                Some(max_items) => max_items.as_i64().take(),
+                Some(max_items) => max_items.as_u64(),
                 _ => None,
             };
 
