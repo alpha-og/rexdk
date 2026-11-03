@@ -9,4 +9,7 @@ pub enum RustGenerateError {
 
     #[error("unsupported Rust type: {0}")]
     UnsupportedType(String),
+
+    #[error("invalid Rust identifier `{name}` in {context}")]
+    InvalidIdentifier { name: String, context: String },
 }
