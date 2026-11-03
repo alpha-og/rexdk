@@ -12,15 +12,10 @@ impl TryFrom<&serde_json::Value> for Schema {
             nullable = types.iter().any(|t| t == "null")
         }
 
-        let description = if let Some(description) = value.get("description") {
-            if let Some(description_str) = description.as_str() {
-                Some(String::from(description_str))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let description = value
+            .get("description")
+            .and_then(serde_json::Value::as_str)
+            .map(String::from);
         let schema_kind = SchemaKind::try_from(value)?;
 
         Ok(Self {

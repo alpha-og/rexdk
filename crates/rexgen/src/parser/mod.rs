@@ -16,8 +16,8 @@ impl TryFrom<&ApiDescription> for Ir {
         let methods = value
             .methods
             .iter()
-            .map(|m| Method::try_from(m).unwrap())
-            .collect();
+            .map(Method::try_from)
+            .collect::<Result<Vec<_>, Self::Error>>()?;
         Ok(Self { endpoints, methods })
     }
 }
