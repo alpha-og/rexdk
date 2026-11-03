@@ -15,7 +15,4 @@ pub enum Error {
 
     #[error("failed to parse generated Rust")]
     Syn(#[from] syn::Error),
-
-    #[error("I/O error")]
-    Io(#[from] std::io::Error),
 }
