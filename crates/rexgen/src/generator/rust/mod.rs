@@ -23,11 +23,11 @@ impl Generator {
         }
     }
 
-    pub fn generate_description(description: Option<&String>) -> TokenStream {
+    fn generate_description(description: Option<&String>) -> TokenStream {
         description.map_or_else(|| quote! {}, |description| quote! {#[doc = #description]})
     }
 
-    pub fn generate_identifier(name: &str) -> Ident {
+    fn generate_identifier(name: &str) -> Ident {
         match name {
             "type" | "where" => Ident::new_raw(name, Span::call_site()),
             _ => Ident::new(name, Span::call_site()),
