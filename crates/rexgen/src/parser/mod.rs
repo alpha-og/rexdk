@@ -12,7 +12,7 @@ pub use error::ParseError;
 impl TryFrom<&ApiDescription> for Ir {
     type Error = ParseError;
     fn try_from(value: &ApiDescription) -> Result<Self, Self::Error> {
-        let endpoints = value.http.clone();
+        let endpoints = None;
         let methods = value
             .methods
             .iter()
