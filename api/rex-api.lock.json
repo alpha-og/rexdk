@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "api_revision": 10,
+  "rex_version": "0.0.1793645657-gd018d2",
+  "server_commit": "d018d2de8cc31281265906a4648ec9cae8d2f4c5",
+  "server_dirty": false,
+  "schema_sha256": "c3ac62d8d918b6a8f8bbf573fdc365d4842b7bab21e0ddb9a9b88c5746bd2833"
+}
