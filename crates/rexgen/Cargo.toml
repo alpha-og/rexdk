@@ -3,8 +3,24 @@ name = "rexgen"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["cli"]
+cli = [
+  "dep:clap",
+  "dep:anyhow",
+  "dep:hex",
+  "dep:sha2",
+  "dep:rexdk",
+  "dep:dirs",
+  "dep:tokio",
+]
+
+[[bin]]
+name = "rexgen"
+required-features = ["cli"]
+
 [dependencies]
-anyhow = { workspace = true }
+
 serde = { workspace = true }
 serde_json = { workspace = true }
 quote = "1"
@@ -13,6 +29,14 @@ heck = "0.5"
 syn = { version = "3" }
 prettyplease = "0.3"
 thiserror = { workspace = true }
+clap = { version = "4.6", features = ["derive"], optional = true }
+anyhow = { workspace = true, optional = true }
+hex = { version = "0.4", optional = true }
+sha2 = { version = "0.11", optional = true }
+rexdk = { path = "../rexdk", optional = true }
+tokio = { workspace = true, optional = true }
+dirs = { workspace = true, optional = true }
+
 
 [dev-dependencies]
 jsonschema = "0.60.2"

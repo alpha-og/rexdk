@@ -6,6 +6,6 @@ pub mod schema;
 
 #[derive(Debug)]
 pub struct Ir {
-    pub endpoints: ApiEndpoints,
+    pub endpoints: Option<ApiEndpoints>,
     pub methods: Vec<Method>,
 }
