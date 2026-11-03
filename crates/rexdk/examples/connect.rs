@@ -1,7 +1,8 @@
-use rexdk::runtime::RexClient;
+use rexdk::RexClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    RexClient::connect().await?;
+    let _client = RexClient::connect(None::<&str>).await?;
+    println!("connected to the Rex server");
     Ok(())
 }
