@@ -20,8 +20,8 @@ pub enum SchemaKind {
     },
     Array {
         items: Box<Schema>,
-        min_items: Option<i64>,
-        max_items: Option<i64>,
+        min_items: Option<u64>,
+        max_items: Option<u64>,
     },
     Object {
         properties: Properties,
