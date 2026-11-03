@@ -1,5 +1,5 @@
 use crate::{generator::rust::registry::TypeRegistry, ir::Ir};
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
 
 mod bindings;
@@ -27,10 +27,12 @@ impl Generator {
         description.map_or_else(|| quote! {}, |description| quote! {#[doc = #description]})
     }
 
-    fn generate_identifier(name: &str) -> Ident {
-        match name {
-            "type" | "where" => Ident::new_raw(name, Span::call_site()),
-            _ => Ident::new(name, Span::call_site()),
-        }
+    pub fn generate_identifier(name: &str, context: &str) -> Result<Ident, RustGenerateError> {
+        syn::parse_str::<Ident>(name) // fails for keywords and invalid names
+            .or_else(|_| syn::parse_str::<Ident>(&format!("r#{name}"))) // fails for self/super/crate/Self
+            .map_err(|_| RustGenerateError::InvalidIdentifier {
+                name: name.to_owned(),
+                context: context.to_owned(),
+            })
     }
 }

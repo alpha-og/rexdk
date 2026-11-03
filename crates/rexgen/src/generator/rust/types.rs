@@ -32,7 +32,7 @@ impl Generator {
         schema: &Schema,
         name: &str,
     ) -> Result<TokenStream, RustGenerateError> {
-        let ident = Self::generate_identifier(name);
+        let ident = Self::generate_identifier(name, &format!("{:?}", schema))?;
         let ty = match &schema.schema_kind {
             SchemaKind::Array {
                 items,
@@ -116,7 +116,7 @@ impl Generator {
         base_type: &Schema,
         values: &Vec<serde_json::Value>,
     ) -> Result<TokenStream, RustGenerateError> {
-        let ident = Self::generate_identifier(name);
+        let ident = Self::generate_identifier(name, &format!("{:?}: [{:?}]", base_type, values))?;
         let description = Self::generate_description(description);
         match base_type.schema_kind {
             SchemaKind::String => {}
@@ -156,8 +156,10 @@ impl Generator {
     ) -> Result<TokenStream, RustGenerateError> {
         let description = Self::generate_description(field.schema.description.as_ref());
 
-        let attribute_name_ident =
-            Self::generate_identifier(&format!("{}", &field.name.to_snake_case()));
+        let attribute_name_ident = Self::generate_identifier(
+            &format!("{}", &field.name.to_snake_case()),
+            &format!("{:?}: {:?}", struct_name, field),
+        )?;
         let serde_rename = (attribute_name_ident.to_string() != field.name).then(|| {
             let field_name = &field.name;
             quote! {
