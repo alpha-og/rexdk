@@ -29,7 +29,7 @@ impl TryFrom<&serde_json::Value> for SchemaKind {
                     description: None,
                     nullable: false,
                 }),
-                values: enum_values.iter().cloned().collect(),
+                values: enum_values.clone(),
             }),
             _ => Ok(base_kind),
         }
