@@ -61,13 +61,7 @@ impl Generator {
                     Properties::Known(properties) => {
                         let struct_attributes = properties
                             .iter()
-                            .map(|property| {
-                                self.generate_struct_attribute(
-                                    name,
-                                    schema.description.as_ref(),
-                                    property,
-                                )
-                            })
+                            .map(|property| self.generate_struct_attribute(name, property))
                             .collect::<Result<Vec<_>, RustGenerateError>>()?;
                         let additional_struct_attribute = additional_attribute_ty.map(|ty| {
                             quote! {
@@ -158,10 +152,9 @@ impl Generator {
     fn generate_struct_attribute(
         &mut self,
         struct_name: &str,
-        description: Option<&String>,
         field: &Field,
     ) -> Result<TokenStream, RustGenerateError> {
-        let description = Self::generate_description(description);
+        let description = Self::generate_description(field.schema.description.as_ref());
 
         let attribute_name_ident =
             Self::generate_identifier(&format!("{}", &field.name.to_snake_case()));
