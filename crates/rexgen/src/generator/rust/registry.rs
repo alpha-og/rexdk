@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, btree_map::Entry};
 
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::TokenStream;
 use thiserror::Error;
 
 #[derive(Default)]
 pub struct TypeRegistry {
-    definitions: BTreeMap<Ident, TokenStream>,
+    definitions: BTreeMap<String, TokenStream>,
 }
 #[derive(Debug, Error)]
 pub enum RegistryError {
@@ -14,8 +14,8 @@ pub enum RegistryError {
 }
 
 impl TypeRegistry {
-    pub fn register(&mut self, name: Ident, definition: TokenStream) -> Result<(), RegistryError> {
-        match self.definitions.entry(name.clone()) {
+    pub fn register(&mut self, name: &str, definition: TokenStream) -> Result<(), RegistryError> {
+        match self.definitions.entry(name.to_string()) {
             Entry::Vacant(entry) => {
                 entry.insert(definition);
                 Ok(())
