@@ -2,6 +2,8 @@
 
 A Rust SDK and binding generator for the Rex control API.
 
+[Rex website](https://www.superlogical.com/rex) · [Rex documentation](https://www.superlogical.com/rex/docs) · [Repository](https://github.com/alpha-og/rexdk-rs)
+
 Rex is a server that runs terminal sessions and keeps them alive independently
 of any attached client. It exposes a JSON control protocol over a local
 WebSocket, which clients use to inspect and manipulate server state.

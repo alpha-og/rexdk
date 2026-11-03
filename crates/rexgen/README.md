@@ -2,6 +2,8 @@
 
 A Rust binding generator for the Rex API.
 
+[Rex website](https://www.superlogical.com/rex) · [Rex documentation](https://www.superlogical.com/rex/docs) · [Repository](https://github.com/alpha-og/rexdk-rs)
+
 `rexgen` converts a Rex API description into Rust source and records the
 provenance of the schema that produced it. The library is pure: it accepts the
 API description as JSON text and returns Rust source as a string. Reading the

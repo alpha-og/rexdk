@@ -2,6 +2,8 @@
 
 A typed Rust client for the Rex control API.
 
+[Rex website](https://www.superlogical.com/rex) · [Rex documentation](https://www.superlogical.com/rex/docs) · [Repository](https://github.com/alpha-og/rexdk-rs)
+
 `rexdk` opens a control connection to a running Rex server, performs the
 `hello`/`welcome` handshake, and exposes the server's methods as generated
 functions with typed parameters and results.
