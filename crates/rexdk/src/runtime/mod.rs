@@ -1,17 +1,19 @@
-mod control;
+mod api;
 mod error;
 
 pub use error::RexError;
 
 use std::{
     collections::HashMap,
+    path::Path,
     sync::{
         Arc, Mutex,
         atomic::{AtomicU64, Ordering},
     },
 };
 
-use control::request::Request;
+use api::{Request, Response};
+use error::ConnectionError;
 
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use serde::{Serialize, de::DeserializeOwned};
@@ -25,17 +27,30 @@ use tokio_tungstenite::{
     tungstenite::{Message, client::IntoClientRequest, http::header::SEC_WEBSOCKET_PROTOCOL},
 };
 
-use crate::runtime::{control::response::Response, error::ConnectionError};
-
+#[derive(Debug)]
 pub struct RexClient {
+    config: RexConfig,
     ws_stream_writer: tokio::sync::Mutex<SplitSink<WebSocketStream<UnixStream>, Message>>,
+    ws_reader_worker: tokio::task::JoinHandle<()>,
     next_request_id: AtomicU64,
     pending_requests: Arc<Mutex<HashMap<String, Sender<Result<Value, RexError>>>>>,
 }
 
+#[derive(Debug, Default)]
+struct RexConfig {
+    api_revision: u32,
+    api_min_revision: u32,
+}
+
 impl RexClient {
-    pub async fn connect() -> Result<Self, RexError> {
-        let socket_path = std::env::var("HOME")? + "/Library/Application Support/rex/server.sock";
+    pub async fn connect<P: AsRef<Path>>(socket_path: Option<P>) -> Result<Self, RexError> {
+        let socket_path = socket_path
+            .map(|path| path.as_ref().to_path_buf())
+            .or_else(|| {
+                dirs::home_dir()
+                    .map(|home| home.join("Library/Application Support/rex/server.sock"))
+            })
+            .ok_or(RexError::SocketPathResolutionFailed)?;
         let unix_stream = UnixStream::connect(socket_path).await?;
         let mut request = "ws://localhost/api/control".into_client_request()?;
         request
@@ -50,13 +65,7 @@ impl RexClient {
             Arc::new(Mutex::new(HashMap::new()));
         let pending = Arc::clone(&pending_requests);
 
-        let client = Self {
-            ws_stream_writer: tokio::sync::Mutex::new(writer),
-            next_request_id: AtomicU64::new(1),
-            pending_requests,
-        };
-
-        tokio::spawn(async move {
+        let ws_reader_worker = tokio::spawn(async move {
             while let Some(message) = reader.next().await {
                 let message = match message {
                     Ok(Message::Text(text)) => text.to_string(),
@@ -93,6 +102,14 @@ impl RexClient {
                 }
             }
         });
+
+        let client = Self {
+            config: RexConfig::default(),
+            ws_stream_writer: tokio::sync::Mutex::new(writer),
+            ws_reader_worker,
+            next_request_id: AtomicU64::new(1),
+            pending_requests,
+        };
 
         Ok(client)
     }
