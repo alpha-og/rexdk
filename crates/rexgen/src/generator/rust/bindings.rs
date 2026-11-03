@@ -45,14 +45,7 @@ impl Generator {
                 rpc_arg_name = quote! {Some(#arg_name)};
                 rpc_arg_ty = quote! {};
 
-                let serde_omit_nullable = if schema.nullable {
-                    quote! {#[serde(skip_serializing_if = "Option::is_none")]}
-                } else {
-                    quote! {}
-                };
-
                 quote! {
-                    #serde_omit_nullable
                     #arg_name: #ty
                 }
             }
