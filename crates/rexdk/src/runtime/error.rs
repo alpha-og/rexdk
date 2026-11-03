@@ -1,59 +1,68 @@
+use thiserror::Error;
 use tokio_tungstenite::tungstenite::{error::ProtocolError, http};
 
-use crate::runtime::control::{handshake::HandshakeError, response::ResponseError};
+use super::api::{HandshakeError, ResponseError};
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum RexError {
-    Api(ResponseError),
+    #[error("failed to resolve the Rex server socket path")]
+    SocketPathResolutionFailed,
+
+    #[error("API error: {0}")]
+    Api(#[from] ResponseError),
+
+    #[error("Request ID space exhausted")]
     RequestIdExhausted,
+
+    #[error("Response channel closed before receiving a response")]
     ResponseChannelClosed,
-    Serialization(serde_json::Error),
-    Connection(ConnectionError),
-    Configuration(anyhow::Error),
-    Internal(anyhow::Error),
+
+    #[error("Failed to serialize or deserialize JSON: {0}")]
+    Serialization(#[from] serde_json::Error),
+
+    #[error(transparent)]
+    Connection(#[from] ConnectionError),
+
+    #[error("Configuration error: {0}")]
+    Configuration(#[source] anyhow::Error),
+
+    #[error("Internal error: {0}")]
+    Internal(#[source] anyhow::Error),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ConnectionError {
+    #[error("Connection closed")]
     ConnectionClosed,
-    Io(std::io::Error),
-    WebSocket(tokio_tungstenite::tungstenite::Error),
-    Protocol(ProtocolError),
-    Handshake(HandshakeError),
+
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("WebSocket error: {0}")]
+    WebSocket(#[from] tokio_tungstenite::tungstenite::Error),
+
+    #[error("WebSocket protocol error: {0}")]
+    Protocol(#[from] ProtocolError),
+
+    #[error("WebSocket handshake failed: {0}")]
+    Handshake(#[from] HandshakeError),
 }
 
-impl std::fmt::Display for RexError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Internal(err) => write!(f, "Internal Error: {err}"),
-            _ => todo!(),
-        }
-    }
-}
-
-impl std::error::Error for RexError {}
-
-impl From<anyhow::Error> for RexError {
-    fn from(value: anyhow::Error) -> Self {
-        Self::Internal(value)
-    }
-}
-
-impl From<serde_json::Error> for RexError {
-    fn from(value: serde_json::Error) -> Self {
-        Self::Serialization(value)
+impl From<std::io::Error> for RexError {
+    fn from(err: std::io::Error) -> Self {
+        Self::Connection(ConnectionError::Io(err))
     }
 }
 
 impl From<tokio_tungstenite::tungstenite::Error> for RexError {
-    fn from(value: tokio_tungstenite::tungstenite::Error) -> Self {
-        Self::Connection(ConnectionError::WebSocket(value))
+    fn from(err: tokio_tungstenite::tungstenite::Error) -> Self {
+        Self::Connection(ConnectionError::WebSocket(err))
     }
 }
 
-impl From<tokio::sync::oneshot::error::RecvError> for RexError {
-    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
-        Self::ResponseChannelClosed
+impl From<HandshakeError> for RexError {
+    fn from(err: HandshakeError) -> Self {
+        Self::Connection(ConnectionError::Handshake(err))
     }
 }
 
@@ -63,26 +72,20 @@ impl From<std::env::VarError> for RexError {
     }
 }
 
-impl From<std::io::Error> for RexError {
-    fn from(err: std::io::Error) -> Self {
-        Self::Connection(ConnectionError::Io(err))
-    }
-}
-
 impl From<http::header::InvalidHeaderValue> for RexError {
     fn from(err: http::header::InvalidHeaderValue) -> Self {
         Self::Configuration(err.into())
     }
 }
 
-impl From<HandshakeError> for RexError {
-    fn from(value: HandshakeError) -> Self {
-        Self::Connection(ConnectionError::Handshake(value))
+impl From<anyhow::Error> for RexError {
+    fn from(err: anyhow::Error) -> Self {
+        Self::Internal(err)
     }
 }
 
-impl From<ResponseError> for RexError {
-    fn from(err: ResponseError) -> Self {
-        Self::Api(err)
+impl From<tokio::sync::oneshot::error::RecvError> for RexError {
+    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
+        Self::ResponseChannelClosed
     }
 }

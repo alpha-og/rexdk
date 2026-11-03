@@ -3,15 +3,14 @@ mod hello;
 mod welcome;
 
 pub use error::HandshakeError;
+use hello::Hello;
+use welcome::Welcome;
 
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::UnixStream;
 use tokio_tungstenite::{WebSocketStream, tungstenite::Message};
 
-use crate::runtime::{
-    RexClient, RexError,
-    control::handshake::{hello::Hello, welcome::Welcome},
-};
+use crate::runtime::{RexClient, RexError};
 
 impl RexClient {
     pub async fn handshake(
