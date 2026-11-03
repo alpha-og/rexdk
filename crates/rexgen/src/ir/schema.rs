@@ -1,4 +1,4 @@
-use crate::ir::field;
+use crate::ir::field::Field;
 
 #[derive(Clone, Debug)]
 pub struct Schema {
@@ -24,15 +24,22 @@ pub enum SchemaKind {
         max_items: Option<i64>,
     },
     Object {
-        properties: Vec<field::Field>,
+        properties: Properties,
         additional_properties: AdditionalProperties,
     },
     Unknown,
 }
 
 #[derive(Clone, Debug)]
+pub enum Properties {
+    Known(Vec<Field>),
+    Unknown,
+    None,
+}
+
+#[derive(Clone, Debug)]
 pub enum AdditionalProperties {
-    Disallowed,
-    Allowed,
+    Disabled,
+    Unknown,
     Schema(Box<Schema>),
 }

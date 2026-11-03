@@ -1,7 +1,7 @@
 use crate::{
     ir::{
         field::Field,
-        schema::{AdditionalProperties, Schema, SchemaKind},
+        schema::{AdditionalProperties, Properties, Schema, SchemaKind},
     },
     parser::error::ParseError,
 };
@@ -48,33 +48,41 @@ fn get_schema_kind_from_str(
                 }
                 _ => vec![],
             };
-            let properties = match value.get("properties") {
-                Some(serde_json::Value::Object(properties)) => properties
-                    .iter()
-                    .map(|(name, schema)| {
-                        let schema = Schema::try_from(schema).unwrap();
-                        let required = required_fields.iter().any(|f| f == name);
-                        Field {
-                            name: name.clone(),
-                            schema,
-                            required,
-                        }
-                    })
-                    .collect(),
-                _ => vec![],
+            let mut properties = match value.get("properties") {
+                Some(serde_json::Value::Object(properties)) => Properties::Known(
+                    properties
+                        .iter()
+                        .map(|(name, schema)| {
+                            let schema = Schema::try_from(schema)?;
+                            let required = required_fields.iter().any(|f| f == name);
+                            Ok(Field {
+                                name: name.clone(),
+                                schema,
+                                required,
+                            })
+                        })
+                        .collect::<Result<Vec<_>, ParseError>>()?,
+                ),
+                _ => Properties::Unknown,
             };
 
             let additional_properties = match value.get("additionalProperties") {
-                Some(serde_json::Value::Bool(true)) => AdditionalProperties::Allowed,
-                Some(serde_json::Value::Bool(false)) => AdditionalProperties::Disallowed,
+                Some(serde_json::Value::Bool(true)) | None => AdditionalProperties::Unknown,
+                Some(serde_json::Value::Bool(false)) => AdditionalProperties::Disabled,
                 Some(schema) if schema.is_object() => {
                     AdditionalProperties::Schema(Box::new(Schema::try_from(schema)?))
                 }
-                None => AdditionalProperties::Allowed,
                 _ => {
                     return Err(ParseError::InvalidSchema);
                 }
             };
+
+            if let (AdditionalProperties::Disabled, Properties::Unknown) =
+                (&additional_properties, &properties)
+            {
+                properties = Properties::None;
+            };
+
             SchemaKind::Object {
                 properties,
                 additional_properties,
