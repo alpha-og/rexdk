@@ -48,18 +48,24 @@ impl Generator {
                 };
                 match base.schema_kind {
                     SchemaKind::String => {}
-                    _ => todo!(),
+                    _ => Err(RustGenerateError::UnsupportedType(format!(
+                        "{0:?}",
+                        base.schema_kind
+                    )))?,
                 }
-                let variants_tokens = values.iter().map(|v| match v.as_str() {
-                    Some(v) => {
-                        let variant = format_ident!("{}", v.to_upper_camel_case());
-                        quote! {
-                            #[serde(rename = #v)]
-                            #variant
+                let variants_tokens = values
+                    .iter()
+                    .map(|v| match v.as_str() {
+                        Some(v) => {
+                            let variant = format_ident!("{}", v.to_upper_camel_case());
+                            Ok(quote! {
+                                #[serde(rename = #v)]
+                                #variant
+                            })
                         }
-                    }
-                    _ => unreachable!(),
-                });
+                        _ => Err(RustGenerateError::UnsupportedType(v.to_string())),
+                    })
+                    .collect::<Result<Vec<_>, RustGenerateError>>()?;
                 let definition = quote! {
                     #description
                     #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
