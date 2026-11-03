@@ -1,10 +1,13 @@
 use crate::{
     generator::rust::{Generator, error::RustGenerateError},
-    ir::schema::{AdditionalProperties, Properties, Schema, SchemaKind},
+    ir::{
+        field::Field,
+        schema::{AdditionalProperties, Properties, Schema, SchemaKind},
+    },
 };
 use heck::{ToSnakeCase, ToUpperCamelCase};
 
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
 impl Generator {
@@ -27,169 +30,75 @@ impl Generator {
     pub(super) fn generate_type(
         &mut self,
         schema: &Schema,
-        name: Ident,
+        name: &str,
     ) -> Result<TokenStream, RustGenerateError> {
+        let ident = Self::generate_identifier(name);
         let ty = match &schema.schema_kind {
             SchemaKind::Array {
                 items,
                 min_items: _,
                 max_items: _,
-            } => {
-                let schema_kind = self.generate_type(&items, name)?;
-                quote! {
-                    Vec<#schema_kind>
-                }
-            }
+            } => self
+                .generate_type(&items, name)
+                .map(Self::generate_array_type)?,
             SchemaKind::Enum { base, values } => {
-                let description = if let Some(description) = &schema.description {
-                    quote! {#[doc = #description]}
-                } else {
-                    quote! {}
-                };
-                match base.schema_kind {
-                    SchemaKind::String => {}
-                    _ => Err(RustGenerateError::UnsupportedType(format!(
-                        "{0:?}",
-                        base.schema_kind
-                    )))?,
-                }
-                let variants_tokens = values
-                    .iter()
-                    .map(|v| match v.as_str() {
-                        Some(v) => {
-                            let variant = format_ident!("{}", v.to_upper_camel_case());
-                            Ok(quote! {
-                                #[serde(rename = #v)]
-                                #variant
-                            })
-                        }
-                        _ => Err(RustGenerateError::UnsupportedType(v.to_string())),
-                    })
-                    .collect::<Result<Vec<_>, RustGenerateError>>()?;
-                let definition = quote! {
-                    #description
-                    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-                    pub enum #name {
-                        #(#variants_tokens,)*
-                    }
-                };
-                self.registry.register(name.clone(), definition)?;
-                quote! {#name}
+                self.generate_enum_type(name, schema.description.as_ref(), base, values)?
             }
             SchemaKind::Object {
                 properties,
                 additional_properties,
             } => {
-                let description = if let Some(description) = &schema.description {
-                    quote! {#[doc = #description]}
-                } else {
-                    quote! {}
-                };
-
-                let mut additional_field_ty: Option<TokenStream> = None;
-                let additional_field = match additional_properties {
-                    AdditionalProperties::Disabled => quote! {},
-                    AdditionalProperties::Unknown => {
-                        let ty = quote! {serde_json::Value};
-                        additional_field_ty = Some(ty.clone());
-                        quote! {
-                            #[serde(flatten)]
-                            pub additional: std::collections::HashMap<String, #ty>
-                        }
-                    }
+                let description = Self::generate_description(schema.description.as_ref());
+                let additional_attribute_ty = match additional_properties {
+                    AdditionalProperties::Disabled => None,
+                    AdditionalProperties::Unknown => Some(quote! {serde_json::Value}),
                     AdditionalProperties::Schema(schema) => {
-                        let ty = self
-                            .generate_type(schema, format_ident!("{}Additional", name.clone()))?;
-                        additional_field_ty = Some(ty.clone());
-                        quote! {
-                            #[serde(flatten)]
-                            pub additional: std::collections::HashMap<String, #ty>
-                        }
+                        Some(self.generate_type(schema, &format!("{}Additional", name))?)
                     }
                 };
 
                 let definition = match properties {
                     Properties::Known(properties) => {
-                        let fields = properties
+                        let struct_attributes = properties
                             .iter()
-                            .map(|p| {
-                                let description = if let Some(description) = &p.schema.description {
-                                    quote! {#[doc = #description]}
-                                } else {
-                                    quote! {}
-                                };
-                                let property_name = p.name.clone();
-                                let child_name = format_ident!(
-                                    "{}{}",
+                            .map(|property| {
+                                self.generate_struct_attribute(
                                     name,
-                                    &property_name.to_upper_camel_case()
-                                );
-
-                                let field_name =
-                                    format_ident!("{}", &property_name.to_snake_case());
-                                let rename = if property_name != field_name.to_string() {
-                                    quote! {
-                                        #[serde(rename = #property_name)]
-                                    }
-                                } else {
-                                    quote! {}
-                                };
-                                let field_name = if field_name == "type" || field_name == "where" {
-                                    format_ident!("r#{}", field_name)
-                                } else {
-                                    field_name
-                                };
-
-                                let field_type = self.generate_type(&p.schema, child_name)?;
-                                let serde_omit_nullable = if !p.required {
-                                    quote! {#[serde(skip_serializing_if = "Option::is_none")]}
-                                } else {
-                                    quote! {}
-                                };
-                                let field_type = if p.required {
-                                    field_type
-                                } else {
-                                    quote! { Option<#field_type> }
-                                };
-
-                                Ok(quote! {
-                                    #description
-                                    #rename
-                                    #serde_omit_nullable
-                                    pub #field_name : #field_type
-                                })
+                                    schema.description.as_ref(),
+                                    property,
+                                )
                             })
                             .collect::<Result<Vec<_>, RustGenerateError>>()?;
-                        quote! {
-                            #description
-                            #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-                            pub struct #name {
-                                #(#fields,)*
+                        let additional_struct_attribute = additional_attribute_ty.map(|ty| {
+                            quote! {
+                                #[serde(flatten)]
+                                pub additional: std::collections::HashMap<String, #ty>
+                            }
+                        });
 
-                                #additional_field
+                        quote! {
+                            pub struct #ident{
+                                #(#struct_attributes,)*
+                                #additional_struct_attribute
                             }
                         }
                     }
                     Properties::Unknown => {
-                        let ty = match additional_field_ty {
-                            Some(ty) => ty,
-                            None => quote! {serde_json::Value},
-                        };
-                        quote! {
-                            #description
-                            #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-                            pub struct #name(pub std::collections::HashMap<String, #ty>);
-                        }
+                        let ty =
+                            additional_attribute_ty.map_or(quote! {serde_json::Value}, |ty| ty);
+                        quote! {pub struct #ident(pub std::collections::HashMap<String, #ty>);}
                     }
-                    Properties::None => quote! {
-                        #description
-                        #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-                        pub struct #name{}
-                    },
+                    Properties::None => quote! {pub struct #ident{}},
                 };
 
-                self.registry.register(name.clone(), definition)?;
-                quote! { #name }
+                let definition = quote! {
+                    #description
+                    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+                    #definition
+                };
+
+                self.registry.register(name, definition)?;
+                quote! { #ident}
             }
             _ => Self::generate_primitive_type(schema)?,
         };
@@ -198,5 +107,86 @@ impl Generator {
         } else {
             Ok(ty)
         }
+    }
+
+    fn generate_array_type(inner_type: TokenStream) -> TokenStream {
+        quote! {
+            Vec<#inner_type>
+        }
+    }
+
+    fn generate_enum_type(
+        &mut self,
+        name: &str,
+        description: Option<&String>,
+        base_type: &Schema,
+        values: &Vec<serde_json::Value>,
+    ) -> Result<TokenStream, RustGenerateError> {
+        let ident = Self::generate_identifier(name);
+        let description = Self::generate_description(description);
+        match base_type.schema_kind {
+            SchemaKind::String => {}
+            _ => Err(RustGenerateError::UnsupportedType(format!(
+                "{0:?}",
+                base_type.schema_kind
+            )))?,
+        }
+        let variants_tokens = values
+            .iter()
+            .map(|v| match v.as_str() {
+                Some(v) => {
+                    let variant = format_ident!("{}", v.to_upper_camel_case());
+                    Ok(quote! {
+                        #[serde(rename = #v)]
+                        #variant
+                    })
+                }
+                _ => Err(RustGenerateError::UnsupportedType(v.to_string())),
+            })
+            .collect::<Result<Vec<_>, RustGenerateError>>()?;
+        let definition = quote! {
+            #description
+            #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+            pub enum #ident{
+                #(#variants_tokens,)*
+            }
+        };
+        self.registry.register(name, definition)?;
+        Ok(quote! {#ident})
+    }
+
+    fn generate_struct_attribute(
+        &mut self,
+        struct_name: &str,
+        description: Option<&String>,
+        field: &Field,
+    ) -> Result<TokenStream, RustGenerateError> {
+        let description = Self::generate_description(description);
+
+        let attribute_name_ident =
+            Self::generate_identifier(&format!("{}", &field.name.to_snake_case()));
+        let serde_rename = (attribute_name_ident.to_string() != field.name).then(|| {
+            let field_name = &field.name;
+            quote! {
+                #[serde(rename = #field_name)]
+            }
+        });
+        let serde_omit_nullable =
+            (!field.required).then(|| quote! {#[serde(skip_serializing_if = "Option::is_none")]});
+
+        let mut attribute_type = self.generate_type(
+            &field.schema,
+            &format!("{}{}", struct_name, &field.name.to_upper_camel_case()),
+        )?;
+        if !field.required {
+            attribute_type = quote! { Option<#attribute_type> };
+        }
+
+        Ok(quote! {
+            #description
+            #serde_rename
+            #serde_omit_nullable
+            pub #attribute_name_ident: #attribute_type
+        })
     }
 }
