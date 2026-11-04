@@ -59,6 +59,16 @@ impl Generator {
 
                 let definition = match properties {
                     Properties::Known(properties) => {
+                        if additional_attribute_ty.is_some()
+                            && properties
+                                .iter()
+                                .any(|property| property.name == "additional")
+                        {
+                            return Err(RustGenerateError::UnsupportedType(format!(
+                                "{name} has a property named `additional` that collides with the flattened map"
+                            )));
+                        }
+
                         let struct_attributes = properties
                             .iter()
                             .map(|property| {
