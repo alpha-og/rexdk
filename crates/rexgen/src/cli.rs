@@ -2,7 +2,11 @@
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
-use std::{fs, path::PathBuf};
+use std::{
+    collections::BTreeSet,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::metadata::{LOCK_SCHEMA_VERSION, SchemaLock, ServerVersion};
 
@@ -23,7 +27,8 @@ enum Command {
         #[arg(long, default_value = "api/rex-api.lock.json")]
         lock: PathBuf,
 
-        #[arg(long, default_value = "crates/rexdk/src/generated.rs")]
+        /// Directory for the generated module tree.
+        #[arg(long, default_value = "crates/rexdk/src/bindings")]
         out: PathBuf,
 
         /// Fail if generated output is stale instead of writing it.
@@ -75,24 +80,113 @@ fn generate(spec_path: PathBuf, lock_path: PathBuf, out_path: PathBuf, check: bo
     schema_lock.verify_integrity(&spec_bytes)?;
 
     let header = schema_lock.generate_header();
-    let generated = rexgen::generate(spec).context("generating bindings")?;
-    let output = format!("{header}{generated}");
 
     if check {
-        let existing = fs::read_to_string(&out_path).ok();
-
-        if existing.as_deref() != Some(output.as_str()) {
-            bail!(
-                "{} is out of date; re-run rexgen generate",
-                out_path.display()
-            );
-        }
+        let files = rexgen::generate(spec, &out_path).context("generating bindings")?;
+        check_output(&out_path, &header, files)
     } else {
-        if let Some(parent) = out_path.parent() {
+        write_output(&out_path, spec, &header)
+    }
+}
+
+fn write_output(out_path: &Path, spec: &str, header: &str) -> Result<()> {
+    let tmp_path = PathBuf::from(format!("{}.tmp", out_path.display()));
+
+    remove_path(&tmp_path)?;
+    fs::create_dir_all(&tmp_path).with_context(|| format!("creating {}", tmp_path.display()))?;
+
+    let files = rexgen::generate(spec, &tmp_path).context("generating bindings")?;
+
+    for file in &files {
+        if let Some(parent) = file.path.parent() {
             fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
         }
 
-        fs::write(&out_path, output).with_context(|| format!("writing {}", out_path.display()))?;
+        fs::write(&file.path, format!("{header}{}", file.contents))
+            .with_context(|| format!("writing {}", file.path.display()))?;
+    }
+
+    remove_path(out_path)?;
+
+    if let Some(parent) = out_path.parent() {
+        fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+    }
+
+    fs::rename(&tmp_path, out_path)
+        .with_context(|| format!("moving {} to {}", tmp_path.display(), out_path.display()))?;
+
+    Ok(())
+}
+
+fn check_output(out_path: &Path, header: &str, files: Vec<rexgen::GeneratedFile>) -> Result<()> {
+    let mut stale = Vec::new();
+    let expected = files
+        .iter()
+        .map(|file| file.path.clone())
+        .collect::<BTreeSet<_>>();
+
+    for file in files {
+        let expected_contents = format!("{header}{}", file.contents);
+
+        match fs::read_to_string(&file.path) {
+            Ok(actual) if actual == expected_contents => {}
+            Ok(_) => stale.push(format!("{} (out of date)", file.path.display())),
+            Err(_) => stale.push(format!("{} (missing)", file.path.display())),
+        }
+    }
+
+    for path in collect_files(out_path)? {
+        if !expected.contains(&path) {
+            stale.push(format!("{} (unexpected)", path.display()));
+        }
+    }
+
+    if stale.is_empty() {
+        return Ok(());
+    }
+
+    bail!(
+        "generated bindings are out of date:\n  {}",
+        stale.join("\n  ")
+    )
+}
+
+fn collect_files(dir: &Path) -> Result<Vec<PathBuf>> {
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    if dir.is_file() {
+        return Ok(vec![dir.to_path_buf()]);
+    }
+
+    let mut files = Vec::new();
+    let mut pending = vec![dir.to_path_buf()];
+
+    while let Some(current) = pending.pop() {
+        for entry in
+            fs::read_dir(&current).with_context(|| format!("reading {}", current.display()))?
+        {
+            let path = entry?.path();
+
+            if path.is_dir() {
+                pending.push(path);
+            } else {
+                files.push(path);
+            }
+        }
+    }
+
+    files.sort();
+
+    Ok(files)
+}
+
+fn remove_path(path: &Path) -> Result<()> {
+    if path.is_dir() {
+        fs::remove_dir_all(path).with_context(|| format!("removing {}", path.display()))?;
+    } else if path.exists() {
+        fs::remove_file(path).with_context(|| format!("removing {}", path.display()))?;
     }
 
     Ok(())
@@ -103,7 +197,11 @@ async fn update_schema(
     lock_path: PathBuf,
     socket_path: Option<PathBuf>,
 ) -> Result<()> {
-    let client = rexdk::RexClient::connect(socket_path).await?;
+    let client_config = rexdk::ClientConfig {
+        socket_path,
+        ..Default::default()
+    };
+    let client = rexdk::Client::connect(Some(client_config)).await?;
     let help = client
         .invoke::<(), serde_json::Value>("help.all", None)
         .await?;
