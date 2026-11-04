@@ -12,4 +12,20 @@ pub enum RustGenerateError {
 
     #[error("invalid Rust identifier `{name}` in {context}")]
     InvalidIdentifier { name: String, context: String },
+
+    #[error("invalid namespace segment `{0}`")]
+    InvalidNamespace(String),
+
+    #[error("namespace segments `{existing}` and `{incoming}` collide as module `{canonical}`")]
+    NamespaceCollision {
+        existing: String,
+        incoming: String,
+        canonical: String,
+    },
+
+    #[error("duplicate binding `{name}` in module `{module}`")]
+    DuplicateBinding { name: String, module: String },
+
+    #[error("failed to parse generated Rust")]
+    Syn(#[from] syn::Error),
 }
