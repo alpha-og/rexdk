@@ -4,6 +4,9 @@ use quote::quote;
 
 mod bindings;
 mod error;
+mod generated_file;
+mod module;
+mod namespace;
 mod registry;
 pub mod types;
 
