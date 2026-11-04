@@ -43,4 +43,17 @@ impl Generator {
                 context: context.to_owned(),
             })
     }
+
+    pub fn generate(&mut self, base: &Path) -> Result<Vec<GeneratedFile>, RustGenerateError> {
+        for method in self.ir.methods.clone() {
+            let path = ModulePath::try_from_segments(&method.namespace)?;
+            let binding = self.generate_binding(&method)?;
+            self.root.insert(&path, binding)?;
+        }
+
+        let mut files = self.root.generate_files(base)?;
+        files.sort_by(|a, b| a.path.cmp(&b.path));
+
+        Ok(files)
+    }
 }
