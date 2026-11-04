@@ -15,8 +15,12 @@ pub struct SchemaLock {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct ServerVersion {
+    /// Omitted by the server when it is 0.
+    #[serde(default)]
     api_revision: u32,
     rex_version: String,
+    /// Omitted by the server when the build commit is unknown.
+    #[serde(default)]
     commit: String,
     dirty: bool,
 }
