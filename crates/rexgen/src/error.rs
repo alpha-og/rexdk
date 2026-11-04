@@ -12,7 +12,4 @@ pub enum Error {
 
     #[error("failed to deserialize API specification")]
     Json(#[from] serde_json::Error),
-
-    #[error("failed to parse generated Rust")]
-    Syn(#[from] syn::Error),
 }
