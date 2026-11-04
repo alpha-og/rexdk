@@ -18,7 +18,11 @@ staleness checks.
 ```rust
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let spec = std::fs::read_to_string("api/rex-api.json")?;
-    let files = rexgen::generate(&spec, std::path::Path::new("bindings"))?;
+    let files = rexgen::generate(
+        &spec,
+        std::path::Path::new("bindings"),
+        &rexgen::Provenance::default(),
+    )?;
 
     for file in files {
         if let Some(parent) = file.path.parent() {
@@ -32,7 +36,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 `generate` returns the binding files only, rooted at the given directory. The
 CLI also prepends a header containing the API revision and schema hash to every
-file.
+file, and passes the lock-file provenance so it is embedded in
+`bindings/metadata.rs`.
 
 ## CLI
 

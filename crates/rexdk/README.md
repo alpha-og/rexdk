@@ -15,6 +15,8 @@ The crate provides:
 - `Error` — the error type returned by the client and generated bindings.
 - `bindings` — one module per API namespace, with one function per API method
   and the request and response types that method requires.
+- `metadata` — compile-time provenance of the generated bindings (API revision,
+  Rex version, commit, schema hash).
 
 ## Installation
 

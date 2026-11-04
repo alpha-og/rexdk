@@ -8,6 +8,7 @@ mod error;
 mod generator;
 mod ir;
 mod parser;
+mod provenance;
 mod spec;
 
 use std::path::Path;
@@ -16,15 +17,21 @@ pub use error::Error;
 pub use generator::GenerateError;
 pub use generator::rust::GeneratedFile;
 pub use parser::ParseError;
+pub use provenance::Provenance;
 
 /// Generates Rust bindings from the JSON text of a rex API description.
 ///
-/// Paths in the returned files are rooted at `base`.
-pub fn generate(spec_json: &str, base: &Path) -> Result<Vec<GeneratedFile>, Error> {
+/// Paths in the returned files are rooted at `base`. Provenance values are
+/// embedded in the generated `bindings::metadata` module.
+pub fn generate(
+    spec_json: &str,
+    base: &Path,
+    provenance: &Provenance,
+) -> Result<Vec<GeneratedFile>, Error> {
     let description: spec::description::ApiDescription = serde_json::from_str(spec_json)?;
     let ir = ir::Ir::try_from(&description)?;
     let files = generator::rust::Generator::new(ir)
-        .generate(base)
+        .generate(base, provenance)
         .map_err(GenerateError::from)?;
     Ok(files)
 }

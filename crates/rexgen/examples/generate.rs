@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|| PathBuf::from("bindings"));
 
     let spec = fs::read_to_string(&path)?;
-    let files = rexgen::generate(&spec, &out)?;
+    let files = rexgen::generate(&spec, &out, &rexgen::Provenance::default())?;
 
     for file in files {
         if let Some(parent) = file.path.parent() {

@@ -69,7 +69,9 @@ The crate-level READMEs cover usage in detail:
 
 `crates/rexdk/src/bindings/` is produced from `api/rex-api.json` and
 verified against `api/rex-api.lock.json`. Each API namespace becomes a Rust
-module (`bindings::session`, `bindings::server::apple`, …).
+module (`bindings::session`, `bindings::server::apple`, …). Provenance is
+available at compile time through `rexdk::metadata` (`METADATA`, `API_REVISION`,
+`SCHEMA_SHA256`, …).
 
 ```sh
 # Fetch the schema and provenance from a running server.

@@ -80,22 +80,36 @@ fn generate(spec_path: PathBuf, lock_path: PathBuf, out_path: PathBuf, check: bo
     schema_lock.verify_integrity(&spec_bytes)?;
 
     let header = schema_lock.generate_header();
+    let provenance = rexgen::Provenance {
+        schema_version: schema_lock.schema_version,
+        api_revision: schema_lock.api_revision,
+        rex_version: schema_lock.rex_version.clone(),
+        server_commit: schema_lock.server_commit.clone(),
+        server_dirty: schema_lock.server_dirty,
+        schema_sha256: schema_lock.schema_sha256.clone(),
+    };
 
     if check {
-        let files = rexgen::generate(spec, &out_path).context("generating bindings")?;
+        let files =
+            rexgen::generate(spec, &out_path, &provenance).context("generating bindings")?;
         check_output(&out_path, &header, files)
     } else {
-        write_output(&out_path, spec, &header)
+        write_output(&out_path, spec, &header, &provenance)
     }
 }
 
-fn write_output(out_path: &Path, spec: &str, header: &str) -> Result<()> {
+fn write_output(
+    out_path: &Path,
+    spec: &str,
+    header: &str,
+    provenance: &rexgen::Provenance,
+) -> Result<()> {
     let tmp_path = PathBuf::from(format!("{}.tmp", out_path.display()));
 
     remove_path(&tmp_path)?;
     fs::create_dir_all(&tmp_path).with_context(|| format!("creating {}", tmp_path.display()))?;
 
-    let files = rexgen::generate(spec, &tmp_path).context("generating bindings")?;
+    let files = rexgen::generate(spec, &tmp_path, provenance).context("generating bindings")?;
 
     for file in &files {
         if let Some(parent) = file.path.parent() {

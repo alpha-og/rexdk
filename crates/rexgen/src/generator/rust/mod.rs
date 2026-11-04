@@ -1,6 +1,7 @@
 mod bindings;
 mod error;
 mod generated_file;
+mod metadata;
 mod module;
 mod namespace;
 mod registry;
@@ -11,6 +12,7 @@ use std::path::Path;
 use crate::{
     generator::rust::{module::Module, namespace::ModulePath},
     ir::Ir,
+    provenance::Provenance,
 };
 pub use error::RustGenerateError;
 pub use generated_file::GeneratedFile;
@@ -44,14 +46,23 @@ impl Generator {
             })
     }
 
-    pub fn generate(&mut self, base: &Path) -> Result<Vec<GeneratedFile>, RustGenerateError> {
+    pub fn generate(
+        &mut self,
+        base: &Path,
+        provenance: &Provenance,
+    ) -> Result<Vec<GeneratedFile>, RustGenerateError> {
         for method in self.ir.methods.clone() {
             let path = ModulePath::try_from_segments(&method.namespace)?;
             let binding = self.generate_binding(&method)?;
             self.root.insert(&path, binding)?;
         }
 
+        self.root.declare(quote! {
+            pub mod metadata;
+        });
+
         let mut files = self.root.generate_files(base)?;
+        files.push(metadata::generate(provenance, base)?);
         files.sort_by(|a, b| a.path.cmp(&b.path));
 
         Ok(files)

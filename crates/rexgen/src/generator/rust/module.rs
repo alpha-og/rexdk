@@ -15,6 +15,7 @@ pub struct Module {
     types: TypeRegistry,
     items: Vec<(String, TokenStream)>,
     children: BTreeMap<String, Child>,
+    extra_declarations: Vec<TokenStream>,
 }
 
 #[derive(Debug)]
@@ -24,6 +25,10 @@ struct Child {
 }
 
 impl Module {
+    pub fn declare(&mut self, declaration: TokenStream) {
+        self.extra_declarations.push(declaration);
+    }
+
     pub fn insert(
         &mut self,
         path: &ModulePath,
@@ -99,6 +104,7 @@ impl Module {
 
         let items = self.items.iter().map(|(_, item)| item);
         let types = self.types.get_all();
+        let extra_declarations = &self.extra_declarations;
         let has_contents = !self.items.is_empty() || !types.is_empty();
         let imports = if has_contents {
             quote! {
@@ -109,6 +115,7 @@ impl Module {
         };
 
         let definition = quote! {
+            #(#extra_declarations)*
             #(#declarations)*
 
             #imports
