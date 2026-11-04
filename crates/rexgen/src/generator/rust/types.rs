@@ -131,7 +131,8 @@ impl Generator {
             .iter()
             .map(|v| match v.as_str() {
                 Some(v) => {
-                    let variant = format_ident!("{}", v.to_upper_camel_case());
+                    let variant =
+                        Self::generate_identifier(&v.to_upper_camel_case(), "enum variant")?;
                     Ok(quote! {
                         #[serde(rename = #v)]
                         #variant

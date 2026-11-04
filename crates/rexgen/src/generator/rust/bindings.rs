@@ -1,5 +1,5 @@
 use heck::{ToSnakeCase, ToUpperCamelCase};
-use proc_macro2::{Ident, Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::{
@@ -21,13 +21,10 @@ impl Generator {
         let mut registry = TypeRegistry::default();
         let rpc_method = &method.rpc_method;
         let method_name = method.name.to_snake_case();
-        let binding_name = Ident::new(&method_name, Span::call_site());
+        let binding_name = Self::generate_identifier(&method_name, "method")?;
         let description = method.description.clone();
 
-        let arg_name = Ident::new(
-            &format!("{method_name}Params").to_snake_case(),
-            Span::call_site(),
-        );
+        let arg_name = Self::generate_identifier(&format!("{method_name}_params"), "argument")?;
         let input_ty_name = format!("{}Params", method_name.to_upper_camel_case());
         let mut rpc_arg_name = quote! {None};
         let mut rpc_arg_ty = quote! {::<(),_>};
