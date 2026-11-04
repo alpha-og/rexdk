@@ -15,9 +15,10 @@ The workspace contains two crates:
 | [`rexdk`](crates/rexdk) | Runtime client for the control connection, plus typed bindings for every server method. |
 | [`rexgen`](crates/rexgen) | Generator that converts a Rex API description into the bindings used by `rexdk`. Also provides the `rexgen` CLI. |
 
-`rexdk` consists of a small runtime (`RexClient`, `RexError`) and
-`generated.rs`, which defines one function per API method together with the
-request and response types that method requires.
+`rexdk` consists of a small runtime (`Client`, `ClientConfig`, `Error`) and
+`bindings/`, a module tree that mirrors the API namespaces and defines one
+function per API method together with the request and response types that
+method requires.
 
 ## Requirements
 
@@ -66,8 +67,9 @@ The crate-level READMEs cover usage in detail:
 
 ## Regenerating the bindings
 
-`crates/rexdk/src/generated.rs` is produced from `api/rex-api.json` and
-verified against `api/rex-api.lock.json`.
+`crates/rexdk/src/bindings/` is produced from `api/rex-api.json` and
+verified against `api/rex-api.lock.json`. Each API namespace becomes a Rust
+module (`bindings::session`, `bindings::server::apple`, …).
 
 ```sh
 # Fetch the schema and provenance from a running server.
@@ -97,7 +99,7 @@ The checked-in spec is API revision 10.
 │   ├── rexdk/              # Runtime client and generated bindings
 │   │   ├── examples/
 │   │   └── src/
-│   │       ├── generated.rs
+│   │       ├── bindings/
 │   │       ├── lib.rs
 │   │       └── runtime/
 │   └── rexgen/             # Spec parser, Rust code generator, and CLI
@@ -111,9 +113,9 @@ The checked-in spec is API revision 10.
   which stream block output, are not implemented.
 - Only Unix domain sockets are supported. The default path is macOS-specific,
   and Windows named pipes are not implemented.
-- Generated method functions take `RexClient` by value. `RexClient` is not
-  `Clone`, so each generated call consumes the connection. Use
-  `RexClient::invoke` for multiple calls on one connection.
+- Generated method functions borrow the client (`client: &Client`), so several
+  calls can share one connection. `Client::invoke` is available for calls
+  without a generated binding.
 - Some optional fields in the API description are generated as
   `Option<Option<T>>`.
 

@@ -1,4 +1,4 @@
-pub mod generated;
+pub mod bindings;
 pub mod runtime;
 
-pub use runtime::{RexClient, RexError};
+pub use runtime::{Client, ClientConfig, Error};

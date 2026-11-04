@@ -10,10 +10,11 @@ functions with typed parameters and results.
 
 The crate provides:
 
-- `RexClient` — connection management and request/response handling.
-- `RexError` — the error type returned by the client and generated bindings.
-- `generated` — one function per API method, with the request and response
-  types that method requires.
+- `Client` — connection management and request/response handling.
+- `ClientConfig` — client identity and socket configuration.
+- `Error` — the error type returned by the client and generated bindings.
+- `bindings` — one module per API namespace, with one function per API method
+  and the request and response types that method requires.
 
 ## Installation
 
@@ -31,34 +32,36 @@ explicit path on any other platform or when the server uses a non-default
 location.
 
 ```rust
-use rexdk::RexClient;
+use rexdk::Client;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let _client = RexClient::connect(None::<&str>).await?;
+    let _client = Client::connect(None).await?;
 
     // Equivalent, with an explicit path:
-    // let _client = RexClient::connect(Some("/tmp/rex.sock")).await?;
+    // let mut config = rexdk::ClientConfig::default();
+    // config.socket_path = Some("/tmp/rex.sock".into());
+    // let _client = Client::connect(Some(config)).await?;
 
     Ok(())
 }
 ```
 
-`connect` is generic over `AsRef<Path>`. When passing `None`, the path type must
-be named, for example `None::<&str>` or `None::<std::path::PathBuf>`.
+`connect` takes an optional `ClientConfig`. When it is `None`, the default
+socket path is used.
 
 ## Calling methods
 
 A generated function performs one call and returns the typed result:
 
 ```rust
-use rexdk::generated::{ServerStatusParams, server_status};
-use rexdk::RexClient;
+use rexdk::Client;
+use rexdk::bindings::server::{StatusParams, status};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = RexClient::connect(None::<&str>).await?;
-    let status = server_status(client, ServerStatusParams {}).await?;
+    let client = Client::connect(None).await?;
+    let status = status(&client, StatusParams {}).await?;
 
     println!(
         "Rex server {} is running (pid {})",
@@ -70,38 +73,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-Generated names follow the API method names: `session.create` becomes
-`session_create`, `server.status` becomes `server_status`, and so on. Parameter
-and result types follow the same convention, such as `SessionCreateParams` and
-`SessionCreateOutput`.
+Generated modules follow the API namespaces: `session.create` becomes
+`bindings::session::create`, and `server.status` becomes
+`bindings::server::status`. Parameter and result types keep the method's name,
+such as `session::CreateParams` and `session::CreateOutput`. A method whose leaf
+name is a Rust keyword is exposed as a raw identifier, for example
+`session::r#move`.
 
-`help.all` is the only method with no input schema, so `help_all` takes only the
+`help.all` is the only method with no input schema, so `help::all` takes only the
 client. Methods that accept an empty object still receive an empty params
-struct, such as `ServerStatusParams {}`.
+struct, such as `server::StatusParams {}`.
 
 ### Client ownership
 
-Generated functions take `client: RexClient` by value, and `RexClient` is not
-`Clone`. A generated call therefore consumes the connection:
+Generated functions borrow the client (`client: &Client`), so a single
+connection handles any number of calls:
 
 ```rust
-let status = server_status(client, ServerStatusParams {}).await?;
-// `client` has been moved.
+let status = rexdk::bindings::server::status(&client, StatusParams {}).await?;
+let sessions = rexdk::bindings::session::list(&client, ListParams {}).await?;
 ```
 
-`RexClient::invoke` borrows the client instead, which allows several calls on a
-single connection:
+`Client::invoke` is available for calls without a generated binding.
 
 ```rust
-use rexdk::RexClient;
-use rexdk::generated::{ServerStatusOutput, ServerWhoamiOutput};
+use rexdk::Client;
+use rexdk::bindings::server::{StatusOutput, WhoamiOutput};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = RexClient::connect(None::<&str>).await?;
+    let client = Client::connect(None).await?;
 
-    let status: ServerStatusOutput = client.invoke("server.status", None::<()>).await?;
-    let whoami: ServerWhoamiOutput = client.invoke("server.whoami", None::<()>).await?;
+    let status: StatusOutput = client.invoke("server.status", None::<()>).await?;
+    let whoami: WhoamiOutput = client.invoke("server.whoami", None::<()>).await?;
 
     println!("pid: {}", status.pid);
     println!("sessions: {}", status.session_count);
@@ -110,24 +114,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-Each generated call requires its own connection.
+Generated functions borrow the client, so a single connection handles any
+number of calls.
 
 ## Error handling
 
-All fallible operations return `RexError`:
+All fallible operations return `Error`:
 
 ```rust
-use rexdk::{RexClient, RexError};
+use rexdk::{Client, Error};
 
-async fn connect_and_query() -> Result<(), RexError> {
-    let client = RexClient::connect(None::<&str>).await?;
-    let _status: rexdk::generated::ServerStatusOutput =
+async fn connect_and_query() -> Result<(), Error> {
+    let client = Client::connect(None).await?;
+    let _status: rexdk::bindings::server::StatusOutput =
         client.invoke("server.status", None::<()>).await?;
     Ok(())
 }
 ```
 
-`RexError` distinguishes connection failures, API errors returned by the
+`Error` distinguishes connection failures, API errors returned by the
 server, serialization errors, and configuration errors. API errors carry the
 server's `code`, HTTP-style `status`, and `message`.
 
@@ -153,8 +158,9 @@ cargo run -p rexdk --example server_status
 
 ## Regenerating the bindings
 
-`src/generated.rs` is produced by `rexgen` from `api/rex-api.json`. It should
-not be edited manually.
+`src/bindings/` is produced by `rexgen` from `api/rex-api.json`. It should
+not be edited manually. Each API namespace is a module, so bindings are called
+as `bindings::server::status(...)`.
 
 ```sh
 cargo run -p rexgen -- update-schema

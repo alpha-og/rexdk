@@ -1,10 +1,10 @@
-use rexdk::RexClient;
-use rexdk::generated::{ServerStatusParams, server_status};
+use rexdk::Client;
+use rexdk::bindings::server::{StatusParams, status};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = RexClient::connect(None::<&str>).await?;
-    let status = server_status(client, ServerStatusParams {}).await?;
+    let client = Client::connect(None).await?;
+    let status = status(&client, StatusParams {}).await?;
 
     println!(
         "Rex server {} is running (pid {})",

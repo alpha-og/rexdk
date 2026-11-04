@@ -1,11 +1,12 @@
 mod api;
+mod config;
 mod error;
 
-pub use error::RexError;
+pub use config::ClientConfig;
+pub use error::Error;
 
 use std::{
     collections::HashMap,
-    path::Path,
     sync::{
         Arc, Mutex,
         atomic::{AtomicU64, Ordering},
@@ -28,29 +29,26 @@ use tokio_tungstenite::{
 };
 
 #[derive(Debug)]
-pub struct RexClient {
-    config: RexConfig,
+pub struct Client {
+    config: ClientConfig,
+    reconnect_token: Option<String>,
     ws_stream_writer: tokio::sync::Mutex<SplitSink<WebSocketStream<UnixStream>, Message>>,
     ws_reader_worker: tokio::task::JoinHandle<()>,
     next_request_id: AtomicU64,
-    pending_requests: Arc<Mutex<HashMap<String, Sender<Result<Value, RexError>>>>>,
+    pending_requests: Arc<Mutex<HashMap<String, Sender<Result<Value, Error>>>>>,
 }
 
-#[derive(Debug, Default)]
-struct RexConfig {
-    api_revision: u32,
-    api_min_revision: u32,
-}
-
-impl RexClient {
-    pub async fn connect<P: AsRef<Path>>(socket_path: Option<P>) -> Result<Self, RexError> {
-        let socket_path = socket_path
-            .map(|path| path.as_ref().to_path_buf())
+impl Client {
+    pub async fn connect(client_config: Option<ClientConfig>) -> Result<Self, Error> {
+        let client_config = client_config.map_or(ClientConfig::default(), |cfg| cfg);
+        let socket_path = client_config
+            .socket_path
+            .clone()
             .or_else(|| {
                 dirs::home_dir()
                     .map(|home| home.join("Library/Application Support/rex/server.sock"))
             })
-            .ok_or(RexError::SocketPathResolutionFailed)?;
+            .ok_or(Error::SocketPathResolutionFailed)?;
         let unix_stream = UnixStream::connect(socket_path).await?;
         let mut request = "ws://localhost/api/control".into_client_request()?;
         request
@@ -58,10 +56,10 @@ impl RexClient {
             .insert(SEC_WEBSOCKET_PROTOCOL, "rex.control.v1".parse()?);
         let (mut ws_stream, _response) = client_async(request, unix_stream).await?;
 
-        Self::handshake(&mut ws_stream).await?;
+        let welcome = Self::handshake(&client_config, None, &mut ws_stream).await?;
         let (writer, mut reader) = ws_stream.split();
 
-        let pending_requests: Arc<Mutex<HashMap<String, Sender<Result<Value, RexError>>>>> =
+        let pending_requests: Arc<Mutex<HashMap<String, Sender<Result<Value, Error>>>>> =
             Arc::new(Mutex::new(HashMap::new()));
         let pending = Arc::clone(&pending_requests);
 
@@ -74,7 +72,7 @@ impl RexClient {
                         eprintln!("WebSocker error: {}", err.to_string());
                         if let Ok(mut pending) = pending.lock() {
                             for (_, tx) in pending.drain() {
-                                let _ = tx.send(Err(RexError::Connection(
+                                let _ = tx.send(Err(Error::Connection(
                                     ConnectionError::ConnectionClosed,
                                 )));
                             }
@@ -104,7 +102,10 @@ impl RexClient {
         });
 
         let client = Self {
-            config: RexConfig::default(),
+            config: client_config,
+            reconnect_token: welcome
+                .client
+                .map_or(None, |client| Some(client.reconnect_token)),
             ws_stream_writer: tokio::sync::Mutex::new(writer),
             ws_reader_worker,
             next_request_id: AtomicU64::new(1),
@@ -122,7 +123,7 @@ impl RexClient {
         Ok(())
     }
 
-    pub async fn invoke<P, R>(&self, method: &str, params: Option<P>) -> Result<R, RexError>
+    pub async fn invoke<P, R>(&self, method: &str, params: Option<P>) -> Result<R, Error>
     where
         P: Serialize,
         R: DeserializeOwned,
@@ -130,7 +131,7 @@ impl RexClient {
         let id = self
             .next_request_id
             .try_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1))
-            .map_err(|_| RexError::RequestIdExhausted)?
+            .map_err(|_| Error::RequestIdExhausted)?
             .to_string();
         let req = Request::new(&id, method, params);
 

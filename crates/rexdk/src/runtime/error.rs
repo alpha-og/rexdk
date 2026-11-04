@@ -1,10 +1,9 @@
-use thiserror::Error;
 use tokio_tungstenite::tungstenite::{error::ProtocolError, http};
 
 use super::api::{HandshakeError, ResponseError};
 
-#[derive(Debug, Error)]
-pub enum RexError {
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
     #[error("failed to resolve the Rex server socket path")]
     SocketPathResolutionFailed,
 
@@ -30,7 +29,7 @@ pub enum RexError {
     Internal(#[source] anyhow::Error),
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum ConnectionError {
     #[error("Connection closed")]
     ConnectionClosed,
@@ -48,43 +47,43 @@ pub enum ConnectionError {
     Handshake(#[from] HandshakeError),
 }
 
-impl From<std::io::Error> for RexError {
+impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         Self::Connection(ConnectionError::Io(err))
     }
 }
 
-impl From<tokio_tungstenite::tungstenite::Error> for RexError {
+impl From<tokio_tungstenite::tungstenite::Error> for Error {
     fn from(err: tokio_tungstenite::tungstenite::Error) -> Self {
         Self::Connection(ConnectionError::WebSocket(err))
     }
 }
 
-impl From<HandshakeError> for RexError {
+impl From<HandshakeError> for Error {
     fn from(err: HandshakeError) -> Self {
         Self::Connection(ConnectionError::Handshake(err))
     }
 }
 
-impl From<std::env::VarError> for RexError {
+impl From<std::env::VarError> for Error {
     fn from(err: std::env::VarError) -> Self {
         Self::Configuration(err.into())
     }
 }
 
-impl From<http::header::InvalidHeaderValue> for RexError {
+impl From<http::header::InvalidHeaderValue> for Error {
     fn from(err: http::header::InvalidHeaderValue) -> Self {
         Self::Configuration(err.into())
     }
 }
 
-impl From<anyhow::Error> for RexError {
+impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
         Self::Internal(err)
     }
 }
 
-impl From<tokio::sync::oneshot::error::RecvError> for RexError {
+impl From<tokio::sync::oneshot::error::RecvError> for Error {
     fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
         Self::ResponseChannelClosed
     }
