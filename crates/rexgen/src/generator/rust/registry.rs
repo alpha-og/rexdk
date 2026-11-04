@@ -7,6 +7,7 @@ use thiserror::Error;
 pub struct TypeRegistry {
     definitions: BTreeMap<String, TokenStream>,
 }
+
 #[derive(Debug, Error)]
 pub enum RegistryError {
     #[error("type name collision: {0}")]
@@ -26,5 +27,9 @@ impl TypeRegistry {
 
     pub fn get_all(&self) -> Vec<&TokenStream> {
         self.definitions.values().collect()
+    }
+
+    pub fn flatten(self) -> Vec<(String, TokenStream)> {
+        self.definitions.into_iter().collect()
     }
 }
