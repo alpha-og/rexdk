@@ -44,10 +44,7 @@ impl Client {
         let socket_path = client_config
             .socket_path
             .clone()
-            .or_else(|| {
-                dirs::home_dir()
-                    .map(|home| home.join("Library/Application Support/rex/server.sock"))
-            })
+            .or_else(|| dirs::data_dir().map(|data_dir| data_dir.join("rex/server.sock")))
             .ok_or(Error::SocketPathResolutionFailed)?;
         let unix_stream = UnixStream::connect(socket_path).await?;
         let mut request = "ws://localhost/api/control".into_client_request()?;
