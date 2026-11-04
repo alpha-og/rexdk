@@ -8,7 +8,7 @@ use crate::{
 use heck::{ToSnakeCase, ToUpperCamelCase};
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::quote;
 
 impl Generator {
     pub(super) fn generate_primitive_type(
@@ -90,8 +90,7 @@ impl Generator {
                         }
                     }
                     Properties::Unknown => {
-                        let ty =
-                            additional_attribute_ty.map_or(quote! {serde_json::Value}, |ty| ty);
+                        let ty = additional_attribute_ty.unwrap_or(quote! {serde_json::Value});
                         quote! {pub struct #ident(pub std::collections::HashMap<String, #ty>);}
                     }
                     Properties::None => quote! {pub struct #ident{}},
@@ -170,10 +169,10 @@ impl Generator {
         let description = Self::generate_description(field.schema.description.as_ref());
 
         let attribute_name_ident = Self::generate_identifier(
-            &format!("{}", &field.name.to_snake_case()),
+            &field.name.to_snake_case(),
             &format!("{:?}: {:?}", struct_name, field),
         )?;
-        let serde_rename = (attribute_name_ident.to_string() != field.name).then(|| {
+        let serde_rename = (attribute_name_ident != field.name.as_str()).then(|| {
             let field_name = &field.name;
             quote! {
                 #[serde(rename = #field_name)]
