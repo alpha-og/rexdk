@@ -7,25 +7,18 @@ use crate::{
     ir::method::Method,
 };
 
+pub(super) struct GeneratedBinding {
+    pub fn_name: String,
+    pub types: Vec<(String, TokenStream)>,
+    pub binding: TokenStream,
+}
+
 impl Generator {
-    pub fn generate_bindings(&mut self) -> Result<TokenStream, RustGenerateError> {
-        let mut bindings = Vec::new();
-
-        for i in 0..self.ir.methods.len() {
-            let method = self.ir.methods[i].clone();
-            bindings.push(self.generate_binding(&method)?);
-        }
-
-        let ty_definitions = self.registry.get_all();
-        Ok(quote! {
-            use crate::runtime::{RexClient, RexError};
-
-            #(#ty_definitions)*
-
-            #(#bindings)*
-        })
-    }
-    fn generate_binding(&mut self, method: &Method) -> Result<TokenStream, RustGenerateError> {
+    pub(super) fn generate_binding(
+        &self,
+        method: &Method,
+    ) -> Result<GeneratedBinding, RustGenerateError> {
+        let mut registry = TypeRegistry::default();
         let rpc_method = &method.rpc_method;
         let method_name = method.name.to_snake_case();
         let binding_name = Ident::new(&method_name, Span::call_site());
@@ -57,11 +50,17 @@ impl Generator {
             None => quote! {()},
         };
 
-        Ok(quote! {
+        let binding = quote! {
             #[doc = #description]
             pub async fn #binding_name(client: RexClient, #args) -> Result<#output_ty, RexError> {
                 client.invoke #rpc_arg_ty(#rpc_method, #rpc_arg_name).await
             }
+        };
+
+        Ok(GeneratedBinding {
+            fn_name: binding_name.to_string(),
+            types: registry.flatten(),
+            binding,
         })
     }
 }
