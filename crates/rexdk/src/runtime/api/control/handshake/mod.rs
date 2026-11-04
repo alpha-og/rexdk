@@ -10,13 +10,15 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::net::UnixStream;
 use tokio_tungstenite::{WebSocketStream, tungstenite::Message};
 
-use crate::runtime::{RexClient, RexError};
+use crate::runtime::{Client, Error, config::ClientConfig};
 
-impl RexClient {
+impl Client {
     pub async fn handshake(
+        client_config: &ClientConfig,
+        reconnect_token: Option<String>,
         ws_stream: &mut WebSocketStream<UnixStream>,
-    ) -> Result<Welcome, RexError> {
-        let hello = Hello::new();
+    ) -> Result<Welcome, Error> {
+        let hello = Hello::new(reconnect_token, client_config);
         let json = serde_json::to_string(&hello)?;
 
         ws_stream.send(Message::Text(json.into())).await?;

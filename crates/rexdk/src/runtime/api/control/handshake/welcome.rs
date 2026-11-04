@@ -7,7 +7,7 @@ pub struct Welcome {
     pub protocol: String,
     pub limits: Limits,
     pub carriers: Option<Vec<Carrier>>,
-    pub api_revision: u32,
+    pub api_revision: Option<u32>,
     pub api_min_revision: Option<u32>,
     pub api_server_revision: Option<u32>,
     pub client: Option<WelcomeClientInfo>,
