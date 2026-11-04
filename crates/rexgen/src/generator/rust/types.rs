@@ -1,5 +1,5 @@
 use crate::{
-    generator::rust::{Generator, error::RustGenerateError},
+    generator::rust::{Generator, error::RustGenerateError, registry::TypeRegistry},
     ir::{
         field::Field,
         schema::{AdditionalProperties, Properties, Schema, SchemaKind},
@@ -28,7 +28,7 @@ impl Generator {
     }
 
     pub(super) fn generate_type(
-        &mut self,
+        registry: &mut TypeRegistry,
         schema: &Schema,
         name: &str,
     ) -> Result<TokenStream, RustGenerateError> {
@@ -38,11 +38,9 @@ impl Generator {
                 items,
                 min_items: _,
                 max_items: _,
-            } => self
-                .generate_type(&items, name)
-                .map(Self::generate_array_type)?,
+            } => Self::generate_type(registry, items, name).map(Self::generate_array_type)?,
             SchemaKind::Enum { base, values } => {
-                self.generate_enum_type(name, schema.description.as_ref(), base, values)?
+                Self::generate_enum_type(registry, name, schema.description.as_ref(), base, values)?
             }
             SchemaKind::Object {
                 properties,
@@ -52,16 +50,20 @@ impl Generator {
                 let additional_attribute_ty = match additional_properties {
                     AdditionalProperties::Disabled => None,
                     AdditionalProperties::Unknown => Some(quote! {serde_json::Value}),
-                    AdditionalProperties::Schema(schema) => {
-                        Some(self.generate_type(schema, &format!("{}Additional", name))?)
-                    }
+                    AdditionalProperties::Schema(schema) => Some(Self::generate_type(
+                        registry,
+                        schema,
+                        &format!("{}Additional", name),
+                    )?),
                 };
 
                 let definition = match properties {
                     Properties::Known(properties) => {
                         let struct_attributes = properties
                             .iter()
-                            .map(|property| self.generate_struct_attribute(name, property))
+                            .map(|property| {
+                                Self::generate_struct_attribute(registry, name, property)
+                            })
                             .collect::<Result<Vec<_>, RustGenerateError>>()?;
                         let additional_struct_attribute = additional_attribute_ty.map(|ty| {
                             quote! {
@@ -91,7 +93,7 @@ impl Generator {
                     #definition
                 };
 
-                self.registry.register(name, definition)?;
+                registry.register(name, definition)?;
                 quote! { #ident}
             }
             _ => Self::generate_primitive_type(schema)?,
@@ -110,7 +112,7 @@ impl Generator {
     }
 
     fn generate_enum_type(
-        &mut self,
+        registry: &mut TypeRegistry,
         name: &str,
         description: Option<&String>,
         base_type: &Schema,
@@ -145,12 +147,12 @@ impl Generator {
                 #(#variants_tokens,)*
             }
         };
-        self.registry.register(name, definition)?;
+        registry.register(name, definition)?;
         Ok(quote! {#ident})
     }
 
     fn generate_struct_attribute(
-        &mut self,
+        registry: &mut TypeRegistry,
         struct_name: &str,
         field: &Field,
     ) -> Result<TokenStream, RustGenerateError> {
@@ -169,9 +171,10 @@ impl Generator {
         let serde_omit_nullable =
             (!field.required).then(|| quote! {#[serde(skip_serializing_if = "Option::is_none")]});
 
-        let mut attribute_type = self.generate_type(
+        let mut attribute_type = Self::generate_type(
+            registry,
             &field.schema,
-            &format!("{}{}", struct_name, &field.name.to_upper_camel_case()),
+            &format!("{}{}", struct_name, field.name.to_upper_camel_case()),
         )?;
         if !field.required {
             attribute_type = quote! { Option<#attribute_type> };

@@ -3,7 +3,7 @@ use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
 
 use crate::{
-    generator::rust::{Generator, error::RustGenerateError},
+    generator::rust::{Generator, error::RustGenerateError, registry::TypeRegistry},
     ir::method::Method,
 };
 
@@ -40,7 +40,7 @@ impl Generator {
         let mut rpc_arg_ty = quote! {::<(),_>};
         let args: TokenStream = match &method.input_schema {
             Some(schema) => {
-                let ty: TokenStream = self.generate_type(&schema, &input_ty_name)?;
+                let ty = Self::generate_type(&mut registry, schema, &input_ty_name)?;
                 rpc_arg_name = quote! {Some(#arg_name)};
                 rpc_arg_ty = quote! {};
 
@@ -53,12 +53,7 @@ impl Generator {
 
         let output_ty_name = format!("{}Output", method_name.to_upper_camel_case());
         let output_ty: TokenStream = match &method.output_schema {
-            Some(schema) => {
-                let ty: TokenStream = self.generate_type(&schema, &output_ty_name)?;
-                quote! {
-                    #ty
-                }
-            }
+            Some(schema) => Self::generate_type(&mut registry, schema, &output_ty_name)?,
             None => quote! {()},
         };
 

@@ -1,7 +1,3 @@
-use crate::{generator::rust::registry::TypeRegistry, ir::Ir};
-use proc_macro2::TokenStream;
-use quote::quote;
-
 mod bindings;
 mod error;
 mod generated_file;
@@ -10,19 +6,28 @@ mod namespace;
 mod registry;
 pub mod types;
 
+use std::path::Path;
+
+use crate::{
+    generator::rust::{module::Module, namespace::ModulePath},
+    ir::Ir,
+};
 pub use error::RustGenerateError;
+pub use generated_file::GeneratedFile;
+use proc_macro2::TokenStream;
+use quote::quote;
 use syn::Ident;
 
 pub struct Generator {
     ir: Ir,
-    registry: TypeRegistry,
+    root: Module,
 }
 
 impl Generator {
     pub fn new(ir: Ir) -> Self {
         Self {
             ir,
-            registry: TypeRegistry::default(),
+            root: Module::default(),
         }
     }
 
