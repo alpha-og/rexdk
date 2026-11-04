@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, btree_map::Entry};
 use proc_macro2::TokenStream;
 use thiserror::Error;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct TypeRegistry {
     definitions: BTreeMap<String, TokenStream>,
 }
