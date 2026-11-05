@@ -1,30 +1,15 @@
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum HandshakeError {
+    #[error("Connection closed")]
     ConnectionClosed,
+    #[error("Handshake rejected: {0}")]
     Rejected(String),
+    #[error("Unexpected message during handshake")]
     UnexpectedMessage,
+    #[error("Invalid welcome message: {0}")]
     InvalidWelcome(String),
-    Timeout,
+    #[error("Handshake timed out: {0}")]
+    Timeout(String),
+    #[error("WebSocket error: {0}")]
+    WebSocket(#[from] tokio_tungstenite::tungstenite::Error),
 }
-
-impl std::fmt::Display for HandshakeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::ConnectionClosed => write!(f, "Connection closed"),
-            Self::Rejected(reason) => {
-                write!(f, "Handshake rejected: {reason}")
-            }
-            Self::UnexpectedMessage => {
-                write!(f, "Unexpected message during handshake")
-            }
-            Self::InvalidWelcome(reason) => {
-                write!(f, "Invalid welcome message: {reason}")
-            }
-            Self::Timeout => {
-                write!(f, "Handshake timed out")
-            }
-        }
-    }
-}
-
-impl std::error::Error for HandshakeError {}
