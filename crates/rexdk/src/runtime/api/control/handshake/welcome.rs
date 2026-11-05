@@ -32,15 +32,3 @@ pub struct WelcomeClientInfo {
 pub struct Limits {
     pub max_message_bytes: usize,
 }
-
-impl TryFrom<Message> for Welcome {
-    type Error = anyhow::Error;
-
-    fn try_from(value: Message) -> anyhow::Result<Self> {
-        let Message::Text(text) = value else {
-            anyhow::bail!("Expected WELCOME text message");
-        };
-
-        Ok(serde_json::from_str(&text)?)
-    }
-}
