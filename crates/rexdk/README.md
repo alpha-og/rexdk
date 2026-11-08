@@ -119,6 +119,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 Generated functions borrow the client, so a single connection handles any
 number of calls.
 
+## Receiving events
+
+The server sends events on the control connection. Take the event stream once
+and consume it alongside requests:
+
+```rust
+use rexdk::{
+    Client,
+    bindings::session::{self, BootstrapParams},
+};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut client = Client::new(None);
+    client.connect().await?;
+
+    session::bootstrap(
+        &client,
+        BootstrapParams {
+            attach_session_ids: None,
+            data_tickets: None,
+            event_scope: "all".into(),
+            preferred_session_id: None,
+        },
+    )
+    .await?;
+
+    let mut events = client.take_event_stream()?;
+    while let Some(event) = events.recv().await {
+        println!("{event:?}");
+    }
+
+    Ok(())
+}
+```
+
+`take_event_stream` can be called once per connection. The stream ends with
+`None` when the connection closes. Events must be consumed promptly; a slow
+consumer applies backpressure to the reader.
+
 ## Error handling
 
 All fallible operations return `Error`:
@@ -149,9 +189,9 @@ cargo run -p rexdk --example server_status
 
 ## Scope and limitations
 
-- Only the control connection is implemented. Server events are read from the
-  socket but are not exposed by the public API. Data connections (`/api/data`),
-  which stream block output, are not implemented.
+- Only the control connection is implemented. Server events are exposed through
+  `Client::take_event_stream`. Data connections (`/api/data`), which stream
+  block output, are not implemented.
 - Only Unix domain sockets are supported. The default path is macOS-specific,
   and Windows named pipes are not implemented.
 - Generated functions consume the client, as described above.

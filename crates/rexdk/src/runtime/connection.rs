@@ -50,7 +50,7 @@ pub struct Connection {
     pub ws_stream_writer: tokio::sync::Mutex<SplitSink<ControlStream, tungstenite::Message>>,
     pub ws_reader_worker: tokio::task::JoinHandle<Result<(), Error>>,
     pub next_request_id: AtomicU64,
-    pub event_stream: EventStream,
+    pub event_stream: Option<EventStream>,
     pub state: Arc<tokio::sync::Mutex<ConnectionState>>,
 }
 

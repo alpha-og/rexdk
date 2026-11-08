@@ -17,6 +17,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )
     .await?;
-    println!("connected to the Rex server");
+
+    let mut events = client.take_event_stream()?;
+    while let Some(event) = events.recv().await {
+        println!("{event:?}");
+    }
+
     Ok(())
 }

@@ -60,6 +60,7 @@ let _client = RexClient::connect(Some("/tmp/rex.sock")).await?;
 | --- | --- | --- |
 | Connect | `cargo run -p rexdk --example connect` | Opens a control connection and completes the handshake. |
 | Server status | `cargo run -p rexdk --example server_status` | Connects and calls the generated `server.status` binding. |
+| Events | `cargo run -p rexdk --example events` | Connects, bootstraps the connection, and prints server events. |
 | Generate bindings | `cargo run -p rexgen --example generate` | Generates Rust source from the checked-in API description. |
 
 The crate-level READMEs cover usage in detail:
@@ -110,9 +111,9 @@ The checked-in spec is API revision 10.
 
 ## Scope and limitations
 
-- Only the control connection is implemented. Server events are read from the
-  socket but are not exposed by the public API. Data connections (`/api/data`),
-  which stream block output, are not implemented.
+- Only the control connection is implemented. Server events are exposed through
+  `Client::take_event_stream`. Data connections (`/api/data`), which stream
+  block output, are not implemented.
 - Only Unix domain sockets are supported. The default path is macOS-specific,
   and Windows named pipes are not implemented.
 - Generated method functions borrow the client (`client: &Client`), so several

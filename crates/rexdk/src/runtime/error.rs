@@ -34,6 +34,9 @@ pub enum Error {
     #[error("Event channel closed")]
     EventChannelClosed,
 
+    #[error("Event stream already taken")]
+    EventStreamTaken,
+
     #[error("Internal error: {0}")]
     Internal(#[source] anyhow::Error),
 }
