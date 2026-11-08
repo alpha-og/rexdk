@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Default)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub enum ClientKind {
     App,
     #[default]
@@ -11,7 +11,7 @@ pub enum ClientKind {
     Other(String),
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Platform {
     MacOS,
     IOS,
@@ -22,7 +22,7 @@ pub enum Platform {
     Other(String),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ClientConfig {
     pub kind: ClientKind,
     pub name: String,
@@ -30,5 +30,36 @@ pub struct ClientConfig {
     pub label: String,
     pub api_revision: u32,
     pub api_min_revision: u32,
-    pub socket_path: Option<PathBuf>,
+    pub transport: Transport,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Transport {
+    UnixSocket { path: PathBuf },
+    Tcp { host: String, port: u16 },
+    Tailscale { hostname: String },
+    NamedPipe { path: String },
+}
+
+impl Default for Transport {
+    fn default() -> Self {
+        #[cfg(unix)]
+        {
+            use crate::Error;
+
+            let path = std::env::var_os("REX_SERVER")
+                .map(PathBuf::from)
+                .or_else(|| dirs::data_dir().map(|data_dir| data_dir.join("rex/server.sock")))
+                .unwrap_or_else(|| panic!("{}", Error::SocketPathResolutionFailed));
+
+            Self::UnixSocket { path }
+        }
+
+        #[cfg(windows)]
+        {
+            let path = std::env::var("REX_SERVER").unwrap_or_else(|_| r"\\.\pipe\rex".to_owned());
+
+            Self::NamedPipe { path }
+        }
+    }
 }

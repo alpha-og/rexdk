@@ -9,18 +9,18 @@ use hello::Hello;
 pub use welcome::Welcome;
 
 use futures_util::{SinkExt, StreamExt};
-use tokio::{net::UnixStream, time::timeout};
-use tokio_tungstenite::{WebSocketStream, tungstenite};
+use tokio::time::timeout;
+use tokio_tungstenite::tungstenite;
 
-use crate::runtime::{Client, Error, api::Message, config::ClientConfig};
+use crate::runtime::{
+    Client, Error,
+    api::Message,
+    connection::{CONTROL_SUBPROTOCOL, ControlStream},
+};
 
 impl Client {
-    pub async fn handshake(
-        client_config: &ClientConfig,
-        reconnect_token: Option<String>,
-        ws_stream: &mut WebSocketStream<UnixStream>,
-    ) -> Result<Welcome, Error> {
-        let hello = Hello::new(reconnect_token, client_config);
+    pub async fn handshake(&self, ws_stream: &mut ControlStream) -> Result<Welcome, Error> {
+        let hello = Hello::new(self.reconnect_token.clone(), &self.config);
         let json = serde_json::to_string(&hello)?;
 
         let ws_message = timeout(Duration::from_secs(5), async {
@@ -48,7 +48,7 @@ impl Client {
             _ => return Err(HandshakeError::UnexpectedMessage.into()),
         };
 
-        if welcome.protocol != "rex.control.v1" {
+        if welcome.protocol != CONTROL_SUBPROTOCOL {
             return Err(HandshakeError::InvalidWelcome(format!(
                 "expected protocol rex.control.v1, got {}",
                 welcome.protocol

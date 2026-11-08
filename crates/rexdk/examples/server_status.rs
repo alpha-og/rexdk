@@ -3,7 +3,8 @@ use rexdk::bindings::server::{StatusParams, status};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::connect(None).await?;
+    let mut client = Client::new(None);
+    client.connect().await?;
     let status = status(&client, StatusParams {}).await?;
 
     println!(

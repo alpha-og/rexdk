@@ -5,6 +5,7 @@ use thiserror::Error;
 #[derive(Debug, Deserialize)]
 pub struct Response {
     pub id: String,
+    #[allow(dead_code)] // retained for the event/response sequence barrier
     pub seq: i64,
     pub payload: Option<Value>,
     pub error: Option<ResponseError>,

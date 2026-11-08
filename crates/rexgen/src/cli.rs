@@ -211,11 +211,16 @@ async fn update_schema(
     lock_path: PathBuf,
     socket_path: Option<PathBuf>,
 ) -> Result<()> {
+    let transport = match socket_path {
+        Some(path) => rexdk::Transport::UnixSocket { path },
+        None => rexdk::Transport::default(),
+    };
     let client_config = rexdk::ClientConfig {
-        socket_path,
+        transport,
         ..Default::default()
     };
-    let client = rexdk::Client::connect(Some(client_config)).await?;
+    let mut client = rexdk::Client::new(Some(client_config));
+    client.connect().await?;
     let help = client
         .invoke::<(), serde_json::Value>("help.all", None)
         .await?;

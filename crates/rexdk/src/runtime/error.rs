@@ -13,8 +13,14 @@ pub enum Error {
     #[error("Request ID space exhausted")]
     RequestIdExhausted,
 
+    #[error("Client is not connected; call connect() first")]
+    NotConnected,
+
     #[error("Response channel closed before receiving a response")]
     ResponseChannelClosed,
+
+    #[error("Protocol error: {0}")]
+    Protocol(String),
 
     #[error("Failed to serialize or deserialize JSON: {0}")]
     Serialization(#[from] serde_json::Error),
@@ -37,8 +43,14 @@ pub enum ConnectionError {
     #[error("Connection closed")]
     ConnectionClosed,
 
+    #[error("Connection closed: {0}")]
+    Closed(String),
+
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Unsupported transport")]
+    UnsupportedTransport { transport: String, platform: String },
 
     #[error("WebSocket error: {0}")]
     WebSocket(#[from] tokio_tungstenite::tungstenite::Error),
