@@ -1,6 +1,7 @@
 mod api;
 mod config;
 mod error;
+mod event_stream;
 
 pub use config::ClientConfig;
 pub use error::Error;
