@@ -3,6 +3,7 @@ mod config;
 mod error;
 mod event_stream;
 
+pub use api::events;
 pub use config::ClientConfig;
 pub use error::Error;
 
@@ -14,7 +15,7 @@ use std::{
     },
 };
 
-use api::{Request, Response};
+use api::Request;
 use error::ConnectionError;
 
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
@@ -22,20 +23,30 @@ use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use tokio::{
     net::UnixStream,
-    sync::oneshot::{self, Sender},
+    sync::{
+        mpsc,
+        oneshot::{self, Sender},
+    },
 };
 use tokio_tungstenite::{
     WebSocketStream, client_async,
-    tungstenite::{Message, client::IntoClientRequest, http::header::SEC_WEBSOCKET_PROTOCOL},
+    tungstenite::{client::IntoClientRequest, http::header::SEC_WEBSOCKET_PROTOCOL},
 };
+
+use crate::runtime::{api::Message, event_stream::EventStream};
+
+const EVENT_BUFFER_CAPACITY: usize = 64;
 
 #[derive(Debug)]
 pub struct Client {
     config: ClientConfig,
     reconnect_token: Option<String>,
-    ws_stream_writer: tokio::sync::Mutex<SplitSink<WebSocketStream<UnixStream>, Message>>,
+    ws_stream_writer: tokio::sync::Mutex<
+        SplitSink<WebSocketStream<UnixStream>, tokio_tungstenite::tungstenite::protocol::Message>,
+    >,
     ws_reader_worker: tokio::task::JoinHandle<()>,
     next_request_id: AtomicU64,
+    event_stream: EventStream,
     pending_requests: Arc<Mutex<HashMap<String, Sender<Result<Value, Error>>>>>,
 }
 
@@ -57,14 +68,24 @@ impl Client {
         let welcome = Self::handshake(&client_config, None, &mut ws_stream).await?;
         let (writer, mut reader) = ws_stream.split();
 
+        let (event_tx, event_rx) = mpsc::channel(EVENT_BUFFER_CAPACITY);
+
         let pending_requests: Arc<Mutex<HashMap<String, Sender<Result<Value, Error>>>>> =
             Arc::new(Mutex::new(HashMap::new()));
         let pending = Arc::clone(&pending_requests);
 
         let ws_reader_worker = tokio::spawn(async move {
             while let Some(message) = reader.next().await {
-                let message = match message {
-                    Ok(Message::Text(text)) => text.to_string(),
+                let message: Message = match message {
+                    Ok(tokio_tungstenite::tungstenite::protocol::Message::Text(text)) => {
+                        match serde_json::from_slice(&text.as_bytes()) {
+                            Ok(message) => message,
+                            Err(err) => {
+                                eprintln!("Invalid message: {err}");
+                                continue;
+                            }
+                        }
+                    }
                     Ok(_) => continue,
                     Err(err) => {
                         eprintln!("WebSocker error: {}", err.to_string());
@@ -78,24 +99,26 @@ impl Client {
                         break;
                     }
                 };
-                let response: Response = match serde_json::from_str(&message) {
-                    Ok(response) => response,
-                    Err(err) => {
-                        eprintln!("Invalid response: {err}");
-                        continue;
-                    }
-                };
-                if let Ok(mut pending_requests) = pending.lock() {
-                    if let Some(tx) = pending_requests.remove(&response.id) {
-                        if let Some(payload) = response.payload {
-                            let _ = tx.send(Ok(payload));
-                        } else if let Some(error) = response.error {
-                            let _ = tx.send(Err(error.into()));
+                match message {
+                    Message::Response(response) => {
+                        if let Ok(mut pending_requests) = pending.lock() {
+                            if let Some(tx) = pending_requests.remove(&response.id) {
+                                if let Some(payload) = response.payload {
+                                    let _ = tx.send(Ok(payload));
+                                } else if let Some(error) = response.error {
+                                    let _ = tx.send(Err(error.into()));
+                                }
+                            }
+                        } else {
+                            eprintln!("Mutex poisoned");
                         }
                     }
-                } else {
-                    eprintln!("Mutex poisoned");
-                }
+                    Message::Event(event) => {
+                        event_tx.send(event).await.unwrap(); // TODO: handle event stream errors
+                        // gracefully
+                    }
+                    _ => continue, // other types of messages are ignored
+                };
             }
         });
 
@@ -106,6 +129,7 @@ impl Client {
                 .map_or(None, |client| Some(client.reconnect_token)),
             ws_stream_writer: tokio::sync::Mutex::new(writer),
             ws_reader_worker,
+            event_stream: EventStream::new(event_rx),
             next_request_id: AtomicU64::new(1),
             pending_requests,
         };
@@ -113,7 +137,10 @@ impl Client {
         Ok(client)
     }
 
-    async fn send(&self, message: Message) -> anyhow::Result<()> {
+    async fn send(
+        &self,
+        message: tokio_tungstenite::tungstenite::protocol::Message,
+    ) -> anyhow::Result<()> {
         let mut writer = self.ws_stream_writer.lock().await;
 
         writer.send(message).await?;
@@ -145,7 +172,11 @@ impl Client {
         pending_requests.insert(id.clone(), tx);
         drop(pending_requests);
 
-        self.send(Message::Text(json.into())).await.map_err(|err| {
+        self.send(tokio_tungstenite::tungstenite::protocol::Message::Text(
+            json.into(),
+        ))
+        .await
+        .map_err(|err| {
             if let Ok(mut pending_requests) = self.pending_requests.lock() {
                 pending_requests.remove(&id);
             }

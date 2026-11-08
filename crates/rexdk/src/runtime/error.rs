@@ -25,6 +25,9 @@ pub enum Error {
     #[error("Configuration error: {0}")]
     Configuration(#[source] anyhow::Error),
 
+    #[error("Event channel closed")]
+    EventChannelClosed,
+
     #[error("Internal error: {0}")]
     Internal(#[source] anyhow::Error),
 }
@@ -86,5 +89,10 @@ impl From<anyhow::Error> for Error {
 impl From<tokio::sync::oneshot::error::RecvError> for Error {
     fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
         Self::ResponseChannelClosed
+    }
+}
+impl From<tokio::sync::mpsc::error::SendError<super::events::EventMessage>> for Error {
+    fn from(_: tokio::sync::mpsc::error::SendError<super::events::EventMessage>) -> Self {
+        Self::EventChannelClosed
     }
 }
