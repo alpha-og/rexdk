@@ -159,6 +159,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 `None` when the connection closes. Events must be consumed promptly; a slow
 consumer applies backpressure to the reader.
 
+`EventStream` also implements `futures_util::Stream`, so `StreamExt::next` and
+`tokio::select!` work directly.
+
 ## Error handling
 
 All fallible operations return `Error`:
