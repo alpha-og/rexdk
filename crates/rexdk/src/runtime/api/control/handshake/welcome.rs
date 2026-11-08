@@ -3,7 +3,6 @@ use tokio_tungstenite::tungstenite::Message;
 
 #[derive(Debug, Deserialize)]
 pub struct Welcome {
-    pub r#type: String,
     pub protocol: String,
     pub limits: Limits,
     pub carriers: Option<Vec<Carrier>>,

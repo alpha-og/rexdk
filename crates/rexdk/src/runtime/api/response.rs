@@ -4,7 +4,6 @@ use thiserror::Error;
 
 #[derive(Debug, Deserialize)]
 pub struct Response {
-    pub r#type: String,
     pub id: String,
     pub seq: i64,
     pub payload: Option<Value>,
