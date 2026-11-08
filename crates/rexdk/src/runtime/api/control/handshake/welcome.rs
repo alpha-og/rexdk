@@ -1,5 +1,4 @@
 use serde::Deserialize;
-use tokio_tungstenite::tungstenite::Message;
 
 #[derive(Debug, Deserialize)]
 pub struct Welcome {
