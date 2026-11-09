@@ -1,3 +1,10 @@
+//! The stream of events from a Rex control connection.
+//!
+//! The stream is stable across reconnects: it ends with `None` only when the
+//! [`Client`](crate::Client) is dropped. Use
+//! [`Client::wait_disconnected`](crate::Client::wait_disconnected) to observe a
+//! connection ending without dropping the client.
+
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -8,6 +15,11 @@ use tokio::sync::mpsc::Receiver;
 
 use crate::events::EventMessage;
 
+/// A stream of events received on the control connection.
+///
+/// Events arrive in order with no gaps in their `seq`. Rex closes a connection
+/// rather than skip an event, so a slow consumer applies backpressure to the
+/// reader. Read events promptly.
 #[derive(Debug)]
 pub struct EventStream {
     rx: Receiver<EventMessage>,
@@ -18,7 +30,7 @@ impl EventStream {
         Self { rx }
     }
 
-    /// Receives the next event, or `None` once the connection is closed.
+    /// Receives the next event, or `None` once the client is dropped.
     pub async fn recv(&mut self) -> Option<EventMessage> {
         self.rx.recv().await
     }

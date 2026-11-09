@@ -2,4 +2,6 @@ pub mod bindings;
 pub mod runtime;
 
 pub use bindings::metadata;
-pub use runtime::{Client, ClientConfig, Error, EventStream, Transport, events};
+pub use runtime::{
+    Client, ClientConfig, DisconnectReason, Error, EventStream, KeepAlive, Transport, events,
+};

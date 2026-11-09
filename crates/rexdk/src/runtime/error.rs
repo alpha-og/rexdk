@@ -1,6 +1,9 @@
 use tokio_tungstenite::tungstenite::{error::ProtocolError, http};
 
-use super::api::{HandshakeError, ResponseError};
+use super::{
+    api::{HandshakeError, ResponseError},
+    disconnect::DisconnectReason,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -12,6 +15,9 @@ pub enum Error {
 
     #[error("Request ID space exhausted")]
     RequestIdExhausted,
+
+    #[error("Message is {size} bytes, above the server limit of {limit} bytes")]
+    MessageTooLarge { size: usize, limit: usize },
 
     #[error("Client is not connected; call connect() first")]
     NotConnected,
@@ -43,11 +49,8 @@ pub enum Error {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectionError {
-    #[error("Connection closed")]
-    ConnectionClosed,
-
     #[error("Connection closed: {0}")]
-    Closed(String),
+    Disconnected(DisconnectReason),
 
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),

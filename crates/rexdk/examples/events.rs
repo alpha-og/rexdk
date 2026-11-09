@@ -19,8 +19,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
 
     let mut events = client.take_event_stream()?;
-    while let Some(event) = events.recv().await {
-        println!("{event:?}");
+    loop {
+        tokio::select! {
+            event = events.recv() => {
+                let Some(event) = event else { break };
+                println!("{event:?}");
+            }
+            reason = client.wait_disconnected() => {
+                println!("disconnected: {reason}");
+                break;
+            }
+        }
     }
 
     Ok(())

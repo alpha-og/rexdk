@@ -17,10 +17,8 @@ use serde_json::Value;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::{TcpStream, UnixStream},
-    sync::{
-        mpsc,
-        oneshot::{self, Sender},
-    },
+    sync::{mpsc, oneshot, oneshot::Sender, watch},
+    task::{AbortHandle, JoinHandle},
 };
 use tokio_tungstenite::{
     WebSocketStream, client_async,
@@ -30,9 +28,11 @@ use tokio_tungstenite::{
 use crate::{
     Client, Error,
     runtime::{
-        config::Transport::{NamedPipe, Tailscale, Tcp, UnixSocket},
-        error::ConnectionError,
-        event_stream::EventStream,
+        config::{
+            KeepAlive,
+            Transport::{NamedPipe, Tailscale, Tcp, UnixSocket},
+        },
+        disconnect::DisconnectReason,
     },
 };
 
@@ -45,80 +45,171 @@ impl<T> AsyncStream for T where T: AsyncRead + AsyncWrite {}
 
 type BoxedStream = Box<dyn AsyncStream + Unpin + Send>;
 pub type ControlStream = WebSocketStream<BoxedStream>;
+pub type ControlWriter = Arc<tokio::sync::Mutex<SplitSink<ControlStream, tungstenite::Message>>>;
 
 pub struct Connection {
-    pub ws_stream_writer: tokio::sync::Mutex<SplitSink<ControlStream, tungstenite::Message>>,
-    pub ws_reader_worker: tokio::task::JoinHandle<Result<(), Error>>,
+    pub writer: ControlWriter,
+    pub reader_task: JoinHandle<()>,
+    pub keepalive_task: Option<JoinHandle<()>>,
     pub next_request_id: AtomicU64,
-    pub event_stream: Option<EventStream>,
     pub state: Arc<tokio::sync::Mutex<ConnectionState>>,
+    /// Largest message the server accepts, from the welcome's `limits`.
+    pub max_message_bytes: usize,
 }
 
 #[derive(Debug, Default)]
 pub struct ConnectionState {
     pub pending_requests: HashMap<String, Sender<Result<Value, Error>>>,
-    pub closed: Option<CloseReason>,
-}
-
-#[derive(Debug, Clone)]
-pub enum CloseReason {
-    Eof,
-    Failed(String),
-}
-
-impl CloseReason {
-    pub fn to_error(&self) -> Error {
-        match self {
-            Self::Eof => Error::Connection(ConnectionError::ConnectionClosed),
-            Self::Failed(reason) => Error::Connection(ConnectionError::Closed(reason.clone())),
-        }
-    }
+    pub closed: Option<DisconnectReason>,
 }
 
 impl std::fmt::Debug for Connection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Connection")
-            .field("ws_reader_worker", &self.ws_reader_worker)
+            .field("reader_task", &self.reader_task)
+            .field("keepalive_task", &self.keepalive_task)
             .field("next_request_id", &self.next_request_id)
-            .field("event_stream", &self.event_stream)
+            .field("max_message_bytes", &self.max_message_bytes)
             .field("state", &self.state)
             .finish_non_exhaustive()
     }
 }
 
 impl Connection {
+    /// Starts the task that reads messages from the control connection.
+    ///
+    /// The task is the only owner of the read half. When it exits it latches
+    /// the disconnect reason in `state`, publishes it on `disconnect_tx`, and
+    /// fails every request that was still waiting for a response.
     pub fn spawn_reader(
         mut reader: SplitStream<ControlStream>,
         state: Arc<tokio::sync::Mutex<ConnectionState>>,
         event_tx: mpsc::Sender<crate::events::EventMessage>,
-    ) -> tokio::task::JoinHandle<Result<(), Error>> {
+        pongs: watch::Sender<u64>,
+        disconnect_tx: watch::Sender<Option<DisconnectReason>>,
+    ) -> JoinHandle<()> {
         tokio::spawn(async move {
-            let outcome = Self::read_loop(&mut reader, &state, &event_tx).await;
-
-            let reason = match &outcome {
-                Ok(()) => CloseReason::Eof,
-                Err(err) => CloseReason::Failed(err.to_string()),
-            };
-
-            let pending: Vec<_> = {
-                let mut guard = state.lock().await;
-                guard.closed = Some(reason.clone());
-                guard.pending_requests.drain().map(|(_, tx)| tx).collect()
-            };
-
-            for tx in pending {
-                let _ = tx.send(Err(reason.to_error()));
-            }
-
-            outcome
+            let reason = Self::read_loop(&mut reader, &state, &event_tx, &pongs).await;
+            Self::teardown(&state, &disconnect_tx, reason, true).await;
         })
+    }
+
+    /// Starts the client-side keepalive loop.
+    ///
+    /// Rex pings every 120 seconds. The client pings on the same schedule so it
+    /// notices a connection that is gone without a close frame. A ping is
+    /// answered when the reader observes a pong; after `max_missed` consecutive
+    /// unanswered pings the connection is failed with
+    /// [`DisconnectReason::KeepAliveTimeout`].
+    pub fn spawn_keepalive(
+        writer: std::sync::Weak<tokio::sync::Mutex<SplitSink<ControlStream, tungstenite::Message>>>,
+        mut pongs: watch::Receiver<u64>,
+        state: Arc<tokio::sync::Mutex<ConnectionState>>,
+        reader: AbortHandle,
+        disconnect_tx: watch::Sender<Option<DisconnectReason>>,
+        config: KeepAlive,
+    ) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            let mut missed = 0;
+
+            loop {
+                tokio::time::sleep(config.interval).await;
+
+                let Some(writer) = writer.upgrade() else {
+                    break;
+                };
+
+                let before = *pongs.borrow_and_update();
+                let nonce = before.wrapping_add(1).to_be_bytes();
+                let ping = {
+                    let mut writer = writer.lock().await;
+                    writer
+                        .send(tungstenite::Message::Ping(nonce.to_vec().into()))
+                        .await
+                };
+                if ping.is_err() {
+                    break;
+                }
+
+                let answered = tokio::time::timeout(config.timeout, async {
+                    loop {
+                        match pongs.changed().await {
+                            Ok(()) if *pongs.borrow() != before => return Some(()),
+                            Ok(()) => {}
+                            // The reader is gone, so its teardown already ran.
+                            Err(_) => return None,
+                        }
+                    }
+                })
+                .await;
+
+                match answered {
+                    Ok(Some(())) => {
+                        missed = 0;
+                        continue;
+                    }
+                    Ok(None) => break,
+                    Err(_) => {}
+                }
+
+                missed += 1;
+                if missed < config.max_missed {
+                    continue;
+                }
+
+                Self::teardown(
+                    &state,
+                    &disconnect_tx,
+                    DisconnectReason::KeepAliveTimeout,
+                    true,
+                )
+                .await;
+                reader.abort();
+
+                let _ = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+                    writer.lock().await.close().await
+                })
+                .await;
+
+                break;
+            }
+        })
+    }
+
+    /// Records that the connection ended and fails every pending request.
+    ///
+    /// The first caller wins: later calls are no-ops. `publish` controls
+    /// whether [`crate::Client::wait_disconnected`] observes this reason.
+    pub async fn teardown(
+        state: &tokio::sync::Mutex<ConnectionState>,
+        disconnect_tx: &watch::Sender<Option<DisconnectReason>>,
+        reason: DisconnectReason,
+        publish: bool,
+    ) {
+        let pending: Vec<_> = {
+            let mut guard = state.lock().await;
+            if guard.closed.is_some() {
+                return;
+            }
+            guard.closed = Some(reason.clone());
+            guard.pending_requests.drain().map(|(_, tx)| tx).collect()
+        };
+
+        if publish {
+            disconnect_tx.send_replace(Some(reason.clone()));
+        }
+
+        for tx in pending {
+            let _ = tx.send(Err(reason.to_error()));
+        }
     }
 
     async fn read_loop(
         reader: &mut SplitStream<ControlStream>,
         state: &tokio::sync::Mutex<ConnectionState>,
         event_tx: &mpsc::Sender<crate::events::EventMessage>,
-    ) -> Result<(), Error> {
+        pongs: &watch::Sender<u64>,
+    ) -> DisconnectReason {
         loop {
             match reader.next().await {
                 Some(Ok(tungstenite::Message::Text(text))) => {
@@ -150,17 +241,49 @@ impl Connection {
                         api::Message::Welcome(_) | api::Message::Unknown => {}
                     }
                 }
-                Some(Ok(tungstenite::Message::Close(_))) | None => return Ok(()),
-                Some(Ok(_)) => {} // ping/pong/binary/frame
-                Some(Err(err)) => {
-                    return Err(Error::Connection(ConnectionError::WebSocket(err)));
+                Some(Ok(tungstenite::Message::Pong(_))) => {
+                    let next = pongs.borrow().wrapping_add(1);
+                    pongs.send_replace(next);
                 }
+                Some(Ok(tungstenite::Message::Close(frame))) => {
+                    return match frame {
+                        Some(frame) => DisconnectReason::Server {
+                            code: u16::from(frame.code),
+                            reason: frame.reason.to_string(),
+                        },
+                        None => DisconnectReason::Server {
+                            code: 1005,
+                            reason: String::new(),
+                        },
+                    };
+                }
+                // tungstenite answers pings automatically while reading.
+                Some(Ok(_)) => {}
+                None => return DisconnectReason::Abnormal,
+                Some(Err(tungstenite::Error::Protocol(
+                    tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
+                ))) => return DisconnectReason::Abnormal,
+                Some(Err(err)) => return DisconnectReason::ReadError(err.to_string()),
             }
         }
     }
 
     pub async fn send(&self, message: tungstenite::Message) -> Result<(), Error> {
-        self.ws_stream_writer.lock().await.send(message).await?;
+        let size = match &message {
+            tungstenite::Message::Text(text) => text.len(),
+            tungstenite::Message::Binary(bytes)
+            | tungstenite::Message::Ping(bytes)
+            | tungstenite::Message::Pong(bytes) => bytes.len(),
+            tungstenite::Message::Close(_) | tungstenite::Message::Frame(_) => 0,
+        };
+        if size > self.max_message_bytes {
+            return Err(Error::MessageTooLarge {
+                size,
+                limit: self.max_message_bytes,
+            });
+        }
+
+        self.writer.lock().await.send(message).await?;
         Ok(())
     }
 
