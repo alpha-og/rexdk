@@ -55,6 +55,13 @@ pub enum ConnectionError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("Failed to connect to {transport}: {source}")]
+    Connect {
+        transport: String,
+        #[source]
+        source: std::io::Error,
+    },
+
     #[error("Unsupported transport")]
     UnsupportedTransport { transport: String, platform: String },
 

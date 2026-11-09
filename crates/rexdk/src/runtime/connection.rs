@@ -33,6 +33,7 @@ use crate::{
             Transport::{NamedPipe, Tailscale, Tcp, UnixSocket},
         },
         disconnect::DisconnectReason,
+        error::ConnectionError,
     },
 };
 
@@ -321,13 +322,28 @@ impl Connection {
     }
 }
 
+fn connect_error(
+    transport: &str,
+    endpoint: impl std::fmt::Display,
+    source: std::io::Error,
+) -> Error {
+    Error::Connection(ConnectionError::Connect {
+        transport: format!("{transport} {endpoint}"),
+        source,
+    })
+}
+
 impl Client {
     pub async fn create_transport(&self) -> Result<ControlStream, Error> {
         let (stream, uri): (BoxedStream, String) = match &self.config.transport {
             UnixSocket { path } => {
                 #[cfg(unix)]
                 {
-                    let stream = Box::new(UnixStream::connect(path).await?);
+                    let stream = Box::new(
+                        UnixStream::connect(path)
+                            .await
+                            .map_err(|source| connect_error("unix socket", path.display(), source))?,
+                    );
                     let uri = format!("ws://localhost{CONTROL_ENDPOINT}");
                     (stream, uri)
                 }
@@ -342,18 +358,30 @@ impl Client {
                 }
             }
             Tcp { host, port } => {
-                let stream = Box::new(TcpStream::connect((host.as_str(), *port)).await?);
+                let stream = Box::new(
+                    TcpStream::connect((host.as_str(), *port))
+                        .await
+                        .map_err(|source| connect_error("tcp", format!("{host}:{port}"), source))?,
+                );
                 (stream, format!("ws://{host}:{port}/api/control"))
             }
             Tailscale { hostname } => {
-                let stream = Box::new(TcpStream::connect((hostname.as_str(), 443)).await?);
+                let stream = Box::new(
+                    TcpStream::connect((hostname.as_str(), 443))
+                        .await
+                        .map_err(|source| connect_error("tailscale", hostname, source))?,
+                );
                 (stream, format!("wss://{hostname}/api/control"))
             }
 
             NamedPipe { path } => {
                 #[cfg(windows)]
                 {
-                    let stream = Box::new(ClientOptions::new().open(path)?);
+                    let stream = Box::new(
+                        ClientOptions::new()
+                            .open(path)
+                            .map_err(|source| connect_error("named pipe", path, source))?,
+                    );
                     (stream, "ws://localhost/api/control".to_owned())
                 }
 
