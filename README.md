@@ -15,10 +15,15 @@ The workspace contains two crates:
 | [`rexdk`](crates/rexdk) | Runtime client for the control connection, plus typed bindings for every server method. |
 | [`rexgen`](crates/rexgen) | Generator that converts a Rex API description into the bindings used by `rexdk`. Also provides the `rexgen` CLI. |
 
-`rexdk` consists of a small runtime (`Client`, `ClientConfig`, `Error`) and
-`bindings/`, a module tree that mirrors the API namespaces and defines one
-function per API method together with the request and response types that
-method requires.
+`rexdk` consists of a small runtime (`Client`, `ClientConfig`, `Error`,
+`DisconnectReason`) and `bindings/`, a module tree that mirrors the API
+namespaces and defines one function per API method together with the request
+and response types that method requires.
+
+The runtime handles the control connection lifecycle: the `hello`/`welcome`
+handshake, request/response matching, keepalive pings, event delivery, manual
+reconnection within the server's 60-second resume window, and reporting why a
+connection ended.
 
 ## Requirements
 
@@ -37,21 +42,31 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ## Quick start
 
 ```rust
-use rexdk::RexClient;
+use rexdk::Client;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let _client = RexClient::connect(None::<&str>).await?;
+    let mut client = Client::new(None);
+    client.connect().await?;
     println!("connected to the Rex server");
     Ok(())
 }
 ```
 
-`connect` takes an optional socket path. When the default path is not valid,
-pass one explicitly:
+`Client::new` takes an optional `ClientConfig`. When the default path is not
+valid, set an explicit transport:
 
 ```rust
-let _client = RexClient::connect(Some("/tmp/rex.sock")).await?;
+use rexdk::{Client, ClientConfig, Transport};
+
+let config = ClientConfig {
+    transport: Transport::UnixSocket {
+        path: "/tmp/rex.sock".into(),
+    },
+    ..Default::default()
+};
+let mut client = Client::new(Some(config));
+client.connect().await?;
 ```
 
 ## Examples
@@ -60,7 +75,8 @@ let _client = RexClient::connect(Some("/tmp/rex.sock")).await?;
 | --- | --- | --- |
 | Connect | `cargo run -p rexdk --example connect` | Opens a control connection and completes the handshake. |
 | Server status | `cargo run -p rexdk --example server_status` | Connects and calls the generated `server.status` binding. |
-| Events | `cargo run -p rexdk --example events` | Connects, bootstraps the connection, and prints server events. |
+| Events | `cargo run -p rexdk --example events` | Connects, bootstraps the connection, and prints server events until it disconnects. |
+| Reconnect | `cargo run -p rexdk --example reconnect` | Reconnects with the last token and re-bootstraps when the server starts a new client. |
 | Generate bindings | `cargo run -p rexgen --example generate` | Generates Rust source from the checked-in API description. |
 
 The crate-level READMEs cover usage in detail:
@@ -114,8 +130,10 @@ The checked-in spec is API revision 10.
 - Only the control connection is implemented. Server events are exposed through
   `Client::take_event_stream`. Data connections (`/api/data`), which stream
   block output, are not implemented.
-- Only Unix domain sockets are supported. The default path is macOS-specific,
-  and Windows named pipes are not implemented.
+- Unix domain sockets, TCP, Tailscale, and Windows named pipes are supported
+  through `Transport`. The default path is macOS-specific.
+- Reconnection is manual: call `Client::reconnect` from your own loop. Requests
+  are never retried automatically.
 - Generated method functions borrow the client (`client: &Client`), so several
   calls can share one connection. `Client::invoke` is available for calls
   without a generated binding.

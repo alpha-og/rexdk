@@ -10,8 +10,10 @@ functions with typed parameters and results.
 
 The crate provides:
 
-- `Client` — connection management and request/response handling.
-- `ClientConfig` — client identity and socket configuration.
+- `Client` — connection management, request/response handling, events, and
+  reconnection.
+- `ClientConfig` — client identity, transport, and keepalive configuration.
+- `DisconnectReason` — why a connection ended.
 - `Error` — the error type returned by the client and generated bindings.
 - `bindings` — one module per API namespace, with one function per API method
   and the request and response types that method requires.
@@ -38,19 +40,26 @@ use rexdk::Client;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let _client = Client::connect(None).await?;
+    let mut client = Client::new(None);
+    client.connect().await?;
 
-    // Equivalent, with an explicit path:
-    // let mut config = rexdk::ClientConfig::default();
-    // config.socket_path = Some("/tmp/rex.sock".into());
-    // let _client = Client::connect(Some(config)).await?;
+    // Equivalent, with an explicit transport:
+    // let config = rexdk::ClientConfig {
+    //     transport: rexdk::Transport::UnixSocket {
+    //         path: "/tmp/rex.sock".into(),
+    //     },
+    //     ..Default::default()
+    // };
+    // let mut client = Client::new(Some(config));
+    // client.connect().await?;
 
     Ok(())
 }
 ```
 
-`connect` takes an optional `ClientConfig`. When it is `None`, the default
-socket path is used.
+`Client::new` takes an optional `ClientConfig`. When it is `None`, the default
+socket path and keepalive schedule are used. `connect` opens the WebSocket and
+performs the `hello`/`welcome` handshake.
 
 ## Calling methods
 
@@ -62,7 +71,8 @@ use rexdk::bindings::server::{StatusParams, status};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::connect(None).await?;
+    let mut client = Client::new(None);
+    client.connect().await?;
     let status = status(&client, StatusParams {}).await?;
 
     println!(
@@ -104,7 +114,8 @@ use rexdk::bindings::server::{StatusOutput, WhoamiOutput};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::connect(None).await?;
+    let mut client = Client::new(None);
+    client.connect().await?;
 
     let status: StatusOutput = client.invoke("server.status", None::<()>).await?;
     let whoami: WhoamiOutput = client.invoke("server.whoami", None::<()>).await?;
@@ -147,20 +158,109 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
 
     let mut events = client.take_event_stream()?;
-    while let Some(event) = events.recv().await {
-        println!("{event:?}");
+    loop {
+        tokio::select! {
+            event = events.recv() => {
+                let Some(event) = event else { break };
+                println!("{event:?}");
+            }
+            reason = client.wait_disconnected() => {
+                println!("disconnected: {reason}");
+                break;
+            }
+        }
     }
 
     Ok(())
 }
 ```
 
-`take_event_stream` can be called once per connection. The stream ends with
-`None` when the connection closes. Events must be consumed promptly; a slow
-consumer applies backpressure to the reader.
+`take_event_stream` can be called once per `Client`. The stream is stable
+across reconnects and ends with `None` only when the `Client` is dropped, so
+use `Client::wait_disconnected` to observe a connection ending. Events must be
+consumed promptly; a slow consumer applies backpressure to the reader.
 
 `EventStream` also implements `futures_util::Stream`, so `StreamExt::next` and
 `tokio::select!` work directly.
+
+## Staying connected
+
+The server pings the client every 120 seconds and closes the connection with
+status 1001 after three unanswered pings. WebSocket libraries answer pings
+automatically; `rexdk` also sends its own pings on the same schedule so that it
+notices a server that has gone away, such as after a laptop sleeps or a network
+path drops without a close frame.
+
+The defaults are `interval: 120s`, `timeout: 60s`, and `max_missed: 3`, matching
+the server. Override them with `ClientConfig::keepalive`, or set it to `None` to
+disable client pings:
+
+```rust
+use std::time::Duration;
+use rexdk::{ClientConfig, KeepAlive};
+
+let config = ClientConfig {
+    keepalive: Some(KeepAlive {
+        interval: Duration::from_secs(120),
+        timeout: Duration::from_secs(60),
+        max_missed: 3,
+    }),
+    ..Default::default()
+};
+```
+
+When the client misses too many pongs it closes the connection with
+`DisconnectReason::KeepAliveTimeout`.
+
+## Disconnecting
+
+`Client::disconnect` closes the connection with a WebSocket close frame. A close
+frame ends the client on the server at once, so the server invalidates the
+reconnect token. `rexdk` keeps the token, but a later connection reports
+`resumed: false` and starts a new client.
+
+```rust
+client.disconnect().await?;
+```
+
+Dropping the `Client` also closes the socket, but cannot send a close frame.
+`Client::is_connected`, `Client::disconnect_reason`, and
+`Client::wait_disconnected` report the connection state.
+
+## Reconnecting
+
+Rex keeps a client for 60 seconds after its connection drops without a close
+frame. `Client::reconnect` drops the old socket without a close frame and opens
+a new one with the token from the last welcome:
+
+```rust
+client.reconnect().await?;
+
+if client.is_resumed() {
+    // The same client and its session attachments were resumed.
+} else {
+    // The server started a new client; set the connection up again.
+    rexdk::bindings::session::bootstrap(
+        &client,
+        rexdk::bindings::session::BootstrapParams {
+            attach_session_ids: None,
+            data_tickets: None,
+            event_scope: "all".into(),
+            preferred_session_id: None,
+        },
+    )
+    .await?;
+}
+```
+
+`Client::wait_disconnected` resolves if the reconnect fails, so a reconnect loop
+cannot hang silently.
+
+Events that happened while disconnected are lost, and `seq` starts again at 1
+on the new connection. Re-read state with `session.view` or `session.bootstrap`
+before applying new events. Requests that were in flight fail with
+`Error::Connection`; the server may still have run them, so check state instead
+of blindly sending them again. See `examples/reconnect.rs` for a full loop.
 
 ## Error handling
 
@@ -170,7 +270,8 @@ All fallible operations return `Error`:
 use rexdk::{Client, Error};
 
 async fn connect_and_query() -> Result<(), Error> {
-    let client = Client::connect(None).await?;
+    let mut client = Client::new(None);
+    client.connect().await?;
     let _status: rexdk::bindings::server::StatusOutput =
         client.invoke("server.status", None::<()>).await?;
     Ok(())
@@ -179,7 +280,11 @@ async fn connect_and_query() -> Result<(), Error> {
 
 `Error` distinguishes connection failures, API errors returned by the
 server, serialization errors, and configuration errors. API errors carry the
-server's `code`, HTTP-style `status`, and `message`.
+server's `code`, HTTP-style `status`, and `message`. Requests that were pending
+when a connection ended fail with `Error::Connection`, whose
+`ConnectionError::Disconnected` holds the `DisconnectReason`. A request larger
+than the welcome's `limits.max_message_bytes` fails with
+`Error::MessageTooLarge` before anything is sent.
 
 ## Examples
 
@@ -188,6 +293,8 @@ With a Rex server running:
 ```sh
 cargo run -p rexdk --example connect
 cargo run -p rexdk --example server_status
+cargo run -p rexdk --example events
+cargo run -p rexdk --example reconnect
 ```
 
 ## Scope and limitations
@@ -195,9 +302,10 @@ cargo run -p rexdk --example server_status
 - Only the control connection is implemented. Server events are exposed through
   `Client::take_event_stream`. Data connections (`/api/data`), which stream
   block output, are not implemented.
-- Only Unix domain sockets are supported. The default path is macOS-specific,
-  and Windows named pipes are not implemented.
-- Generated functions consume the client, as described above.
+- Unix domain sockets, TCP, Tailscale, and Windows named pipes are supported
+  through `Transport`. The default path is macOS-specific.
+- Automatic reconnection is not implemented; call `Client::reconnect` from your
+  own loop. Requests are never retried automatically.
 - Some optional fields in the API description are generated as
   `Option<Option<T>>`.
 
