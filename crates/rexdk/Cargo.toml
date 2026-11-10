@@ -18,3 +18,5 @@ futures-util = "0.3"
 thiserror = { workspace = true }
 dirs = { workspace = true }
 percent-encoding = { workspace = true }
+bytes = "1.12.1"
+base64 = "0.22"
