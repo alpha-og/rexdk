@@ -1,9 +1,6 @@
 use serde_json::Value;
 
-use crate::runtime::api::{
-    control::{Hello, Request, Response, Welcome},
-    events::EventMessage,
-};
+use crate::runtime::api::control::{Hello, Request, Response, Welcome, events::EventMessage};
 
 /// A control-connection message.
 ///

@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::runtime::api::events::{Client, ClientReference};
+use crate::runtime::api::control::events::{Client, ClientReference};
 
 /// Events about the Rex server and its clients.
 ///

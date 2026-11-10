@@ -7,7 +7,6 @@
 
 pub(crate) mod control;
 pub mod data;
-pub mod events;
 mod message;
 
 pub use control::ControlMessage;

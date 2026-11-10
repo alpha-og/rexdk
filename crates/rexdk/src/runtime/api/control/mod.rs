@@ -5,6 +5,7 @@
 //! and `event`; the client sends one `hello` and then only `request`
 //! messages. Skip a `type` you do not know, because a newer server may add one.
 
+pub mod events;
 mod hello;
 mod message;
 mod request;

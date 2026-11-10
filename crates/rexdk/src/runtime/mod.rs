@@ -7,7 +7,7 @@ mod error;
 mod event_stream;
 mod transport;
 
-pub use api::{data::decode_ticket, events};
+pub use api::{control::events, data::decode_ticket};
 pub use config::{ClientConfig, KeepAlive};
 pub use connection::{
     ConnectionContext, ConnectionError, ConnectionErrorKind, ConnectionPhase, ControlError,
