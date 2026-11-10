@@ -4,12 +4,14 @@ mod connection;
 mod disconnect;
 mod error;
 mod event_stream;
+mod transport;
 
 pub use api::events;
 pub use config::{ClientConfig, KeepAlive, Transport};
 pub use disconnect::DisconnectReason;
 pub use error::Error;
 pub use event_stream::EventStream;
+pub use transport::Transport;
 
 use std::sync::{Arc, atomic::AtomicU64};
 
