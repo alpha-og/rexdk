@@ -1,4 +1,5 @@
 pub mod bindings;
+mod protocol;
 pub mod runtime;
 
 pub use bindings::metadata;

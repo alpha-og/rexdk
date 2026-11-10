@@ -3,7 +3,7 @@
 
 use thiserror::Error;
 
-use crate::runtime::api::data::reject::RejectReason;
+use crate::protocol::data::reject::RejectReason;
 
 /// Errors encountered while processing data-connection handshake messages.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]

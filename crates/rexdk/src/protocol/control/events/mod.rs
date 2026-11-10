@@ -183,7 +183,7 @@ fn raw_event(value: &Value) -> RawEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::api::ControlMessage;
+    use crate::protocol::ControlMessage;
 
     fn decode(json: &str) -> EventMessage {
         match serde_json::from_str::<ControlMessage>(json).expect("message decodes") {

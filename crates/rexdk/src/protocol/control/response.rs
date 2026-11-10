@@ -2,7 +2,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use thiserror::Error;
 
-/// A server response to a [`crate::runtime::api::control::Request`].
+/// A server response to a [`crate::protocol::control::Request`].
 ///
 /// A response carries the `id` of the request it answers and either `payload`
 /// with the result or `error` with the failure. `seq` is the sequence number of

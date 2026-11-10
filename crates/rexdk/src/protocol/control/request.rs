@@ -3,8 +3,8 @@ use serde::Serialize;
 /// A client-to-server control request.
 ///
 /// Requests are JSON text on `/api/control` and are the only message a client
-/// sends after its [`crate::runtime::api::control::Hello`]. The server answers
-/// each one with a [`crate::runtime::api::control::Response`] carrying the same
+/// sends after its [`crate::protocol::control::Hello`]. The server answers
+/// each one with a [`crate::protocol::control::Response`] carrying the same
 /// `id`.
 ///
 /// `id` must be non-empty and must differ from the `id` of every request still

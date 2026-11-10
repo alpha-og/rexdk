@@ -38,11 +38,11 @@ use tokio_tungstenite::tungstenite::{
 
 use crate::{
     Error,
+    protocol::{
+        DataMessage,
+        data::{Hello, RECONNECT_TOKEN_LEN, Resume, TICKET_LEN, Welcome},
+    },
     runtime::{
-        api::{
-            DataMessage,
-            data::{Hello, RECONNECT_TOKEN_LEN, Resume, TICKET_LEN, Welcome},
-        },
         data_stream::DataStream,
         transport::{Stream, Transport},
     },

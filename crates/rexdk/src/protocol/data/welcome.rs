@@ -24,7 +24,7 @@
 
 use bytes::Bytes;
 
-use crate::runtime::api::data::{
+use crate::protocol::data::{
     DataMessageError,
     error::{DecodeError, ProtocolError, WelcomeError},
 };

@@ -1,5 +1,5 @@
-use crate::runtime::api;
-use crate::runtime::api::control::{Hello, Welcome};
+use crate::protocol;
+use crate::protocol::control::{ClientInfo, Hello, Platform, Welcome};
 use crate::runtime::config::ClientConfig;
 use crate::runtime::connection::{
     ConnectionContext, ConnectionError, ConnectionErrorKind, ControlError, HANDSHAKE_TIMEOUT,
@@ -219,14 +219,15 @@ impl ControlConnection {
         loop {
             match reader.next().await {
                 Some(Ok(tungstenite::Message::Text(text))) => {
-                    let Ok(message) = serde_json::from_str::<api::ControlMessage>(text.as_str())
+                    let Ok(message) =
+                        serde_json::from_str::<protocol::ControlMessage>(text.as_str())
                     else {
                         // A single malformed frame does not invalidate the
                         // connection; keep serving subsequent messages.
                         continue;
                     };
                     match message {
-                        api::ControlMessage::Response(response) => {
+                        protocol::ControlMessage::Response(response) => {
                             let tx = state.lock().await.pending_requests.remove(&response.id);
                             if let Some(tx) = tx {
                                 let result = match (response.payload, response.error) {
@@ -240,15 +241,15 @@ impl ControlConnection {
                                 let _ = tx.send(result);
                             }
                         }
-                        api::ControlMessage::Event(event) => {
+                        protocol::ControlMessage::Event(event) => {
                             // If the consumer dropped the event stream, stop
                             // forwarding events but keep serving responses.
                             let _ = event_tx.send(event).await;
                         }
-                        api::ControlMessage::Hello(_)
-                        | api::ControlMessage::Request(_)
-                        | api::ControlMessage::Welcome(_)
-                        | api::ControlMessage::Unknown => {}
+                        protocol::ControlMessage::Hello(_)
+                        | protocol::ControlMessage::Request(_)
+                        | protocol::ControlMessage::Welcome(_)
+                        | protocol::ControlMessage::Unknown => {}
                     }
                 }
                 Some(Ok(tungstenite::Message::Pong(_))) => {
@@ -320,7 +321,7 @@ impl ControlConnection {
             .try_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1))
             .map_err(|_| Error::RequestIdExhausted)?
             .to_string();
-        let req = api::control::Request::new(&id, method, params);
+        let req = protocol::control::Request::new(&id, method, params);
         let json = serde_json::to_string(&req)?;
 
         let (tx, rx) = oneshot::channel();
@@ -344,6 +345,35 @@ impl ControlConnection {
     }
 }
 
+/// Builds the HELLO describing this client.
+fn hello(reconnect_token: Option<String>, config: &ClientConfig) -> Hello {
+    Hello::new(
+        reconnect_token,
+        ClientInfo::new(
+            config.kind.clone(),
+            config.name.clone(),
+            config.version.clone(),
+            config.label.clone(),
+            current_platform(),
+        ),
+        config.api_revision,
+        config.api_min_revision,
+    )
+}
+
+/// Names the platform this client was built for.
+fn current_platform() -> Platform {
+    match std::env::consts::OS {
+        "macos" => Platform::MacOS,
+        "ios" => Platform::IOS,
+        "linux" => Platform::Linux,
+        "windows" => Platform::Windows,
+        "freebsd" => Platform::FreeBSD,
+        "emscripten" | "wasm32" => Platform::Web,
+        other => Platform::Other(other.to_string()),
+    }
+}
+
 /// Sends HELLO and waits for WELCOME on a control connection.
 pub(crate) async fn handshake(
     config: &ClientConfig,
@@ -351,7 +381,7 @@ pub(crate) async fn handshake(
     stream: &mut Stream,
     context: &ConnectionContext,
 ) -> Result<Welcome, ConnectionError> {
-    let hello = Hello::new(reconnect_token, config);
+    let hello = hello(reconnect_token, config);
     let json = serde_json::to_string(&hello).map_err(|err| {
         ConnectionError::new(
             context.clone(),
@@ -398,8 +428,8 @@ pub(crate) async fn handshake(
 
     let welcome = match message {
         tungstenite::Message::Text(text) => {
-            match serde_json::from_slice::<api::ControlMessage>(text.as_bytes()) {
-                Ok(api::ControlMessage::Welcome(welcome)) => welcome,
+            match serde_json::from_slice::<protocol::ControlMessage>(text.as_bytes()) {
+                Ok(protocol::ControlMessage::Welcome(welcome)) => welcome,
                 Ok(_) => {
                     return Err(ConnectionError::new(
                         context.clone(),

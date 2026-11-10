@@ -1,8 +1,8 @@
 //! Connection setup, handshakes, and long-lived connection tasks.
 //!
-//! The `api` module describes protocol messages; this module owns the I/O that
-//! speaks them. Control and data connections share the transport timeout and
-//! the HELLO/RESUME timeout defined here.
+//! The `protocol` module describes protocol messages; this module owns the I/O
+//! that speaks them. Control and data connections share the transport timeout
+//! and the HELLO/RESUME timeout defined here.
 
 mod control;
 mod data;

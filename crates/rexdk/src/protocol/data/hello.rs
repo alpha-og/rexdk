@@ -24,7 +24,7 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use bytes::Bytes;
 
-use crate::runtime::api::data::{DataMessageError, error::DecodeError};
+use crate::protocol::data::{DataMessageError, error::DecodeError};
 
 /// HELLO message opcode.
 pub const HELLO_OPCODE: u8 = 0x01;

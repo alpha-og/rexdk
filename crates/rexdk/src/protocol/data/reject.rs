@@ -1,4 +1,4 @@
-use crate::runtime::api::data::{DataMessageError, error::DecodeError};
+use crate::protocol::data::{DataMessageError, error::DecodeError};
 
 /// REJECT message opcode
 pub const REJECT_OPCODE: u8 = 0x82;

@@ -1,4 +1,4 @@
-use crate::runtime::api::{control::ControlMessage, data::DataMessage};
+use crate::protocol::{control::ControlMessage, data::DataMessage};
 
 /// A message from either Rex protocol family.
 ///

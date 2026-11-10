@@ -1,4 +1,3 @@
-mod api;
 mod config;
 mod connection;
 mod data_stream;
@@ -7,7 +6,7 @@ mod error;
 mod event_stream;
 mod transport;
 
-pub use api::{control::events, data::decode_ticket};
+pub use crate::protocol::{control::events, data::decode_ticket};
 pub use config::{ClientConfig, KeepAlive};
 pub use connection::{
     ConnectionContext, ConnectionError, ConnectionErrorKind, ConnectionPhase, ControlError,
@@ -340,7 +339,7 @@ impl Client {
     /// connection is cleaned up when the client is dropped.
     pub async fn connect_data(
         &mut self,
-        ticket: [u8; api::data::TICKET_LEN],
+        ticket: [u8; crate::protocol::data::TICKET_LEN],
         subprotocol: &str,
     ) -> Result<(DataStream, DataStreamHandle), Error> {
         // Finished workers stay in the list until the next connection opens.

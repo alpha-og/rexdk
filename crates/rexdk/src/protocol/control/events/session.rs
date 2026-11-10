@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::runtime::api::control::events::Principal;
+use crate::protocol::control::events::Principal;
 
 /// Events scoped to a session.
 ///

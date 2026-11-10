@@ -1,6 +1,6 @@
 use bytes::Bytes;
 
-use crate::runtime::api::data::TICKET_LEN;
+use crate::protocol::data::TICKET_LEN;
 
 /// RESUME message opcode.
 pub const RESUME_OPCODE: u8 = 0x02;

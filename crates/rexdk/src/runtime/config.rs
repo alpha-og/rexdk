@@ -2,27 +2,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::Transport;
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub enum ClientKind {
-    App,
-    #[default]
-    Cli,
-    Agent,
-    Other(String),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Platform {
-    MacOS,
-    IOS,
-    Linux,
-    Windows,
-    FreeBSD,
-    Web,
-    Other(String),
-}
+use crate::{Transport, protocol::control::ClientKind};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ClientConfig {

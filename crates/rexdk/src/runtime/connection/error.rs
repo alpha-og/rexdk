@@ -8,10 +8,9 @@
 
 use std::fmt;
 
-use crate::runtime::{
-    api::data::{DataMessageError, RejectReason},
-    disconnect::DisconnectReason,
-    transport::TransportError,
+use crate::{
+    protocol::data::{DataMessageError, RejectReason},
+    runtime::{disconnect::DisconnectReason, transport::TransportError},
 };
 
 /// The point in a connection's life when an error happened.

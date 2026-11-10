@@ -1,4 +1,5 @@
-use super::{api::control::ResponseError, connection::ConnectionError};
+use super::connection::ConnectionError;
+use crate::protocol::control::ResponseError;
 
 /// Errors returned by the Rex client.
 #[derive(Debug, thiserror::Error)]

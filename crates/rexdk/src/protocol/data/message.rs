@@ -1,6 +1,6 @@
 use bytes::Bytes;
 
-use crate::runtime::api::data::{
+use crate::protocol::data::{
     DataMessageError, Hello, Reject, Welcome, error::DecodeError, reject::REJECT_OPCODE,
     resume::Resume, welcome::WELCOME_OPCODE,
 };
