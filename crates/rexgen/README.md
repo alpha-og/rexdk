@@ -72,7 +72,7 @@ If the spec changed without a corresponding lock update, generation fails.
 | --- | --- | --- |
 | `--spec` | `api/rex-api.json` | Output path for the API description. |
 | `--lock` | `api/rex-api.lock.json` | Output path for the provenance file. |
-| `--socket` | `RexClient` default | Rex server socket to connect to. |
+| `--socket` | default transport | Rex server socket path to connect to. |
 
 `update-schema` connects to a running Rex server and calls `help.all` and
 `server.version`. It writes the API description and a lock file containing:

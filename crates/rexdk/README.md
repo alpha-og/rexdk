@@ -1,21 +1,25 @@
 # rexdk
 
-A typed Rust client for the Rex control API.
+A typed Rust client for the Rex API.
 
 [Rex website](https://www.superlogical.com/rex) · [Rex documentation](https://www.superlogical.com/rex/docs) · [Repository](https://github.com/alpha-og/rexdk-rs)
 
 `rexdk` opens a control connection to a running Rex server, performs the
 `hello`/`welcome` handshake, and exposes the server's methods as generated
-functions with typed parameters and results.
+functions with typed parameters and results. It can also open data connections
+that stream a block's output.
 
 The crate provides:
 
 - `Client` — connection management, request/response handling, events, data
   connections, and reconnection.
 - `ClientConfig` — client identity, transport, and keepalive configuration.
+- `Transport` — Unix socket, TCP, Tailscale, or Windows named pipe endpoint.
 - `DataStream` / `DataStreamHandle` — block output and its connection handle.
 - `DisconnectReason` — why a connection ended.
 - `Error` — the error type returned by the client and generated bindings.
+- `ConnectionError` / `TransportError` — structured connection and transport
+  failures.
 - `bindings` — one module per API namespace, with one function per API method
   and the request and response types that method requires.
 - `metadata` — compile-time provenance of the generated bindings (API revision,
@@ -32,9 +36,9 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ## Connecting
 
 `rexdk` connects over a Unix domain socket. Its default path is
-`~/Library/Application Support/rex/server.sock`, which exists on macOS. Pass an
-explicit path on any other platform or when the server uses a non-default
-location.
+`~/Library/Application Support/rex/server.sock` on macOS. Set `REX_SERVER` or
+pass an explicit transport on any other platform or when the server uses a
+non-default location.
 
 ```rust
 use rexdk::Client;
@@ -327,14 +331,14 @@ async fn connect_and_query() -> Result<(), Error> {
 }
 ```
 
-`Error` distinguishes connection failures, API errors returned by the
-server, serialization errors, and configuration errors. API errors carry the
-server's `code`, HTTP-style `status`, and `message`. Requests that were pending
-when a connection ended fail with `Error::Connection`, whose
-`ConnectionError` carries a `ConnectionErrorKind::Control` with the
-`DisconnectReason`, plus the connection context. A request larger than the
-welcome's `limits.max_message_bytes` fails with `Error::MessageTooLarge` before
-anything is sent.
+`Error` distinguishes connection failures, API errors returned by the server,
+serialization and configuration errors, and misuse such as calling
+`Client::invoke` while disconnected. API errors carry the server's `code`,
+HTTP-style `status`, and `message`. Requests that were pending when a connection
+ended fail with `Error::Connection`, whose `ConnectionError` carries a
+`ConnectionErrorKind::Control` with the `DisconnectReason`, plus the connection
+context. A request larger than the welcome's `limits.max_message_bytes` fails
+with `Error::MessageTooLarge` before anything is sent.
 
 ## Examples
 
@@ -354,8 +358,9 @@ cargo run -p rexdk --example reconnect
   through `Client::open_data` or `Client::connect_data`.
 - Unix domain sockets, TCP, Tailscale, and Windows named pipes are supported
   through `Transport`. The default path is macOS-specific.
-- Automatic reconnection is not implemented; call `Client::reconnect` from your
-  own loop. Requests are never retried automatically.
+- Control reconnection is manual; call `Client::reconnect` from your own loop.
+  Requests are never retried automatically. Data streams resume automatically
+  after a transport drop, within the server's resume window.
 - Some optional fields in the API description are generated as
   `Option<Option<T>>`.
 
