@@ -1,4 +1,7 @@
-use super::api;
+use crate::{DisconnectReason, runtime::transport::Stream};
+use crate::{Error, KeepAlive};
+
+use crate::runtime::api;
 
 use std::{
     collections::HashMap,
@@ -8,47 +11,25 @@ use std::{
     },
 };
 
+use tokio::{
+    sync::{mpsc, oneshot, oneshot::Sender, watch},
+    task::{AbortHandle, JoinHandle},
+};
+
 use futures_util::{
     SinkExt, StreamExt,
     stream::{SplitSink, SplitStream},
 };
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    net::{TcpStream, UnixStream},
-    sync::{mpsc, oneshot, oneshot::Sender, watch},
-    task::{AbortHandle, JoinHandle},
-};
-use tokio_tungstenite::{
-    WebSocketStream, client_async,
-    tungstenite::{self, client::IntoClientRequest, http::header::SEC_WEBSOCKET_PROTOCOL},
-};
+use tokio_tungstenite::tungstenite;
 
-use crate::{
-    Client, Error,
-    runtime::{
-        config::{
-            KeepAlive,
-            Transport::{NamedPipe, Tailscale, Tcp, UnixSocket},
-        },
-        disconnect::DisconnectReason,
-        error::ConnectionError,
-    },
-};
-
-const CONTROL_ENDPOINT: &str = "/api/control";
+pub const CONTROL_ENDPOINT: &str = "/api/control";
 pub const CONTROL_SUBPROTOCOL: &str = "rex.control.v1";
 
-pub trait AsyncStream: AsyncRead + AsyncWrite {}
+pub type ControlWriter = Arc<tokio::sync::Mutex<SplitSink<Stream, tungstenite::Message>>>;
 
-impl<T> AsyncStream for T where T: AsyncRead + AsyncWrite {}
-
-type BoxedStream = Box<dyn AsyncStream + Unpin + Send>;
-pub type ControlStream = WebSocketStream<BoxedStream>;
-pub type ControlWriter = Arc<tokio::sync::Mutex<SplitSink<ControlStream, tungstenite::Message>>>;
-
-pub struct Connection {
+pub struct ControlConnection {
     pub writer: ControlWriter,
     pub reader_task: JoinHandle<()>,
     pub keepalive_task: Option<JoinHandle<()>>,
@@ -64,9 +45,9 @@ pub struct ConnectionState {
     pub closed: Option<DisconnectReason>,
 }
 
-impl std::fmt::Debug for Connection {
+impl std::fmt::Debug for ControlConnection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Connection")
+        f.debug_struct("ControlConnection")
             .field("reader_task", &self.reader_task)
             .field("keepalive_task", &self.keepalive_task)
             .field("next_request_id", &self.next_request_id)
@@ -76,14 +57,14 @@ impl std::fmt::Debug for Connection {
     }
 }
 
-impl Connection {
+impl ControlConnection {
     /// Starts the task that reads messages from the control connection.
     ///
     /// The task is the only owner of the read half. When it exits it latches
     /// the disconnect reason in `state`, publishes it on `disconnect_tx`, and
     /// fails every request that was still waiting for a response.
     pub fn spawn_reader(
-        mut reader: SplitStream<ControlStream>,
+        mut reader: SplitStream<Stream>,
         state: Arc<tokio::sync::Mutex<ConnectionState>>,
         event_tx: mpsc::Sender<crate::events::EventMessage>,
         pongs: watch::Sender<u64>,
@@ -103,7 +84,7 @@ impl Connection {
     /// unanswered pings the connection is failed with
     /// [`DisconnectReason::KeepAliveTimeout`].
     pub fn spawn_keepalive(
-        writer: std::sync::Weak<tokio::sync::Mutex<SplitSink<ControlStream, tungstenite::Message>>>,
+        writer: std::sync::Weak<tokio::sync::Mutex<SplitSink<Stream, tungstenite::Message>>>,
         mut pongs: watch::Receiver<u64>,
         state: Arc<tokio::sync::Mutex<ConnectionState>>,
         reader: AbortHandle,
@@ -206,7 +187,7 @@ impl Connection {
     }
 
     async fn read_loop(
-        reader: &mut SplitStream<ControlStream>,
+        reader: &mut SplitStream<Stream>,
         state: &tokio::sync::Mutex<ConnectionState>,
         event_tx: &mpsc::Sender<crate::events::EventMessage>,
         pongs: &watch::Sender<u64>,
@@ -319,89 +300,5 @@ impl Connection {
         let payload = rx.await??;
 
         Ok(serde_json::from_value(payload)?)
-    }
-}
-
-fn connect_error(
-    transport: &str,
-    endpoint: impl std::fmt::Display,
-    source: std::io::Error,
-) -> Error {
-    Error::Connection(ConnectionError::Connect {
-        transport: format!("{transport} {endpoint}"),
-        source,
-    })
-}
-
-impl Client {
-    pub async fn create_transport(&self) -> Result<ControlStream, Error> {
-        let (stream, uri): (BoxedStream, String) = match &self.config.transport {
-            UnixSocket { path } => {
-                #[cfg(unix)]
-                {
-                    let stream = Box::new(
-                        UnixStream::connect(path)
-                            .await
-                            .map_err(|source| connect_error("unix socket", path.display(), source))?,
-                    );
-                    let uri = format!("ws://localhost{CONTROL_ENDPOINT}");
-                    (stream, uri)
-                }
-
-                #[cfg(not(unix))]
-                {
-                    use crate::runtime::error::ConnectionError::UnsupportedTransport;
-                    return Err(Error::Connection(UnsupportedTransport {
-                        transport: "UnixSocket".into(),
-                        platform: "Windows".into(),
-                    }));
-                }
-            }
-            Tcp { host, port } => {
-                let stream = Box::new(
-                    TcpStream::connect((host.as_str(), *port))
-                        .await
-                        .map_err(|source| connect_error("tcp", format!("{host}:{port}"), source))?,
-                );
-                (stream, format!("ws://{host}:{port}/api/control"))
-            }
-            Tailscale { hostname } => {
-                let stream = Box::new(
-                    TcpStream::connect((hostname.as_str(), 443))
-                        .await
-                        .map_err(|source| connect_error("tailscale", hostname, source))?,
-                );
-                (stream, format!("wss://{hostname}/api/control"))
-            }
-
-            NamedPipe { path } => {
-                #[cfg(windows)]
-                {
-                    let stream = Box::new(
-                        ClientOptions::new()
-                            .open(path)
-                            .map_err(|source| connect_error("named pipe", path, source))?,
-                    );
-                    (stream, "ws://localhost/api/control".to_owned())
-                }
-
-                #[cfg(not(windows))]
-                {
-                    use crate::runtime::error::ConnectionError::UnsupportedTransport;
-
-                    let _ = path;
-                    return Err(Error::Connection(UnsupportedTransport {
-                        transport: "NamedPipe".into(),
-                        platform: "Non Windows".into(),
-                    }));
-                }
-            }
-        };
-        let mut request = uri.into_client_request()?;
-        request
-            .headers_mut()
-            .insert(SEC_WEBSOCKET_PROTOCOL, CONTROL_SUBPROTOCOL.parse()?);
-        let (ws, _) = client_async(request, stream).await?;
-        Ok(ws)
     }
 }
