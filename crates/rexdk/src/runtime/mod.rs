@@ -1,15 +1,18 @@
 mod api;
 mod config;
 mod connection;
+mod data_stream;
 mod disconnect;
 mod error;
 mod event_stream;
 mod transport;
 
-pub use api::events;
-pub use config::{ClientConfig, KeepAlive, Transport};
+pub use api::{data::decode_ticket, events};
+pub use config::{ClientConfig, KeepAlive};
+pub use connection::DataStreamHandle;
+pub use data_stream::DataStream;
 pub use disconnect::DisconnectReason;
-pub use error::Error;
+pub use error::{DataError, Error};
 pub use event_stream::EventStream;
 pub use transport::Transport;
 
@@ -21,7 +24,10 @@ use tokio::sync::{mpsc, watch};
 
 use crate::{
     events::EventMessage,
-    runtime::connection::{Connection, ConnectionState},
+    runtime::connection::{
+        CONTROL_ENDPOINT, CONTROL_SUBPROTOCOL, ConnectionState, ControlConnection, DATA_ENDPOINT,
+        DataConnectContext,
+    },
 };
 
 const EVENT_BUFFER_CAPACITY: usize = 64;
@@ -31,11 +37,12 @@ pub struct Client {
     config: ClientConfig,
     reconnect_token: Option<String>,
     resumed: bool,
-    connection: Option<Connection>,
+    connection: Option<ControlConnection>,
     event_tx: mpsc::Sender<EventMessage>,
     event_rx: Option<mpsc::Receiver<EventMessage>>,
     disconnect_tx: watch::Sender<Option<DisconnectReason>>,
     disconnect_rx: watch::Receiver<Option<DisconnectReason>>,
+    data_streams: Vec<DataStreamHandle>,
 }
 
 impl Client {
@@ -52,6 +59,7 @@ impl Client {
             event_rx: Some(event_rx),
             disconnect_tx,
             disconnect_rx,
+            data_streams: vec![],
         }
     }
 
@@ -79,7 +87,9 @@ impl Client {
     }
 
     async fn connect_inner(&mut self) -> Result<(), Error> {
-        let mut control_stream = self.create_transport().await?;
+        let mut control_stream = self
+            .create_transport(CONTROL_ENDPOINT, CONTROL_SUBPROTOCOL)
+            .await?;
         let welcome = self.handshake(&mut control_stream).await?;
         let max_message_bytes = welcome.limits.max_message_bytes;
         let (writer, reader) = control_stream.split();
@@ -91,7 +101,7 @@ impl Client {
         // Reset before the reader starts, so an immediate close is not lost.
         self.disconnect_tx.send_replace(None);
 
-        let reader_task = Connection::spawn_reader(
+        let reader_task = ControlConnection::spawn_reader(
             reader,
             Arc::clone(&state),
             self.event_tx.clone(),
@@ -99,7 +109,7 @@ impl Client {
             self.disconnect_tx.clone(),
         );
         let keepalive_task = self.config.keepalive.clone().map(|config| {
-            Connection::spawn_keepalive(
+            ControlConnection::spawn_keepalive(
                 Arc::downgrade(&writer),
                 pongs_rx,
                 Arc::clone(&state),
@@ -120,7 +130,7 @@ impl Client {
             }
         }
 
-        self.connection = Some(Connection {
+        self.connection = Some(ControlConnection {
             writer,
             reader_task,
             keepalive_task,
@@ -141,7 +151,7 @@ impl Client {
             return;
         };
 
-        let Connection {
+        let ControlConnection {
             writer,
             reader_task,
             keepalive_task,
@@ -154,7 +164,7 @@ impl Client {
         }
         reader_task.abort();
 
-        Connection::teardown(&state, &self.disconnect_tx, reason, publish).await;
+        ControlConnection::teardown(&state, &self.disconnect_tx, reason, publish).await;
 
         drop(writer);
     }
@@ -164,14 +174,17 @@ impl Client {
     /// A close frame ends the client on the server at once, so the server
     /// invalidates the reconnect token. The token is kept in case a later
     /// connection reuses it, but the server will report `resumed: false` and
-    /// start a new client. Use [`Client::reconnect`] to resume instead. The
-    /// event stream stays open; it ends when the `Client` is dropped.
+    /// start a new client. Use [`Client::reconnect`] to resume instead. Data
+    /// connections are closed first. The event stream stays open; it ends when
+    /// the `Client` is dropped.
     pub async fn disconnect(&mut self) -> Result<(), Error> {
+        self.disconnect_data().await;
+
         let Some(connection) = self.connection.take() else {
             return Ok(());
         };
 
-        let Connection {
+        let ControlConnection {
             writer,
             reader_task,
             keepalive_task,
@@ -189,7 +202,8 @@ impl Client {
         })
         .await;
 
-        Connection::teardown(&state, &self.disconnect_tx, DisconnectReason::Local, true).await;
+        ControlConnection::teardown(&state, &self.disconnect_tx, DisconnectReason::Local, true)
+            .await;
 
         Ok(())
     }
@@ -294,6 +308,57 @@ impl Client {
         }
     }
 
+    /// Opens a data connection with a ticket from `data.connect`.
+    ///
+    /// The HELLO/WELCOME handshake is performed before this returns, so a
+    /// refused ticket is reported here rather than on the stream. The returned
+    /// handle can be used to disconnect; the client also keeps a clone so the
+    /// connection is cleaned up when the client is dropped.
+    pub async fn connect_data(
+        &mut self,
+        ticket: [u8; api::data::TICKET_LEN],
+        subprotocol: &str,
+    ) -> Result<(DataStream, DataStreamHandle), Error> {
+        // Finished workers stay in the list until the next connection opens.
+        self.data_streams.retain(|handle| !handle.is_finished());
+
+        let stream = self.create_transport(DATA_ENDPOINT, subprotocol).await?;
+        let context = DataConnectContext {
+            transport: self.config.transport.clone(),
+            subprotocol: subprotocol.to_owned(),
+        };
+
+        let (data_stream, handle) = DataStream::create(context, ticket, stream).await?;
+        self.data_streams.push(handle.clone());
+
+        Ok((data_stream, handle))
+    }
+
+    /// Calls `data.connect` and opens the data connection in one step.
+    ///
+    /// `ConnectParams::subprotocol` must be set, because the WebSocket needs
+    /// the same subprotocol in its handshake.
+    pub async fn open_data(
+        &mut self,
+        params: crate::bindings::data::ConnectParams,
+    ) -> Result<(DataStream, DataStreamHandle), Error> {
+        let Some(subprotocol) = params.subprotocol.clone() else {
+            return Err(DataError::MissingSubprotocol.into());
+        };
+
+        let output = crate::bindings::data::connect(self, params).await?;
+        let ticket = decode_ticket(&output.ticket)?;
+
+        self.connect_data(ticket, &subprotocol).await
+    }
+
+    /// Closes every data connection gracefully.
+    pub async fn disconnect_data(&mut self) {
+        let handles = std::mem::take(&mut self.data_streams);
+
+        futures_util::future::join_all(handles.iter().map(DataStreamHandle::disconnect)).await;
+    }
+
     /// Takes the event stream from the connection.
     ///
     /// The stream can be moved into another task while the client keeps
@@ -316,7 +381,7 @@ impl Client {
         self.connection()?.invoke(method, params).await
     }
 
-    fn connection(&self) -> Result<&Connection, Error> {
+    fn connection(&self) -> Result<&ControlConnection, Error> {
         self.connection.as_ref().ok_or_else(|| {
             self.disconnect_rx
                 .borrow()
@@ -328,6 +393,10 @@ impl Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
+        for handle in &self.data_streams {
+            handle.abort();
+        }
+
         if let Some(connection) = self.connection.take() {
             if let Some(task) = connection.keepalive_task {
                 task.abort();
