@@ -10,9 +10,10 @@ functions with typed parameters and results.
 
 The crate provides:
 
-- `Client` — connection management, request/response handling, events, and
-  reconnection.
+- `Client` — connection management, request/response handling, events, data
+  connections, and reconnection.
 - `ClientConfig` — client identity, transport, and keepalive configuration.
+- `DataStream` / `DataStreamHandle` — block output and its connection handle.
 - `DisconnectReason` — why a connection ended.
 - `Error` — the error type returned by the client and generated bindings.
 - `bindings` — one module per API namespace, with one function per API method
@@ -183,6 +184,47 @@ consumed promptly; a slow consumer applies backpressure to the reader.
 `EventStream` also implements `futures_util::Stream`, so `StreamExt::next` and
 `tokio::select!` work directly.
 
+## Data connections
+
+A data connection streams one block's output, such as a terminal. The control
+connection must be attached to the block's session first. `Client::open_data`
+calls `data.connect` and opens the WebSocket in one step:
+
+```rust
+use rexdk::bindings::data::ConnectParams;
+
+let (mut stream, handle) = client
+    .open_data(ConnectParams {
+        session_id,
+        block_id,
+        data_ref_id: "terminal".into(),
+        subprotocol: Some("rex.data.terminal.v1".into()),
+    })
+    .await?;
+
+while let Some(chunk) = stream.recv().await {
+    let bytes = chunk?;
+    // Chunks are arbitrary parts of one continuous byte stream.
+    println!("{}", bytes.len());
+}
+
+// Or, to close while the stream is still alive:
+handle.disconnect().await?;
+```
+
+`open_data` requires `subprotocol` to be set, because the WebSocket and the
+ticket must use the same one. If you already have a ticket, use
+`Client::connect_data(ticket, subprotocol)`; `rexdk::decode_ticket` converts
+the base64url string from `data.connect` into the 16 ticket bytes.
+
+The stream resumes automatically after a transport drop, using the reconnect
+token and the number of bytes the worker has accepted. `DataStream::channel_nonce`
+returns the WELCOME's channel nonce, which marks Rex's own terminal control
+sequences. Dropping the stream asks the worker to close with status 1000;
+`DataStream::close().await` waits for it. `Client::disconnect` closes data
+connections before the control connection, and `Client::disconnect_data` closes
+only the data connections.
+
 ## Staying connected
 
 The server pings the client every 120 seconds and closes the connection with
@@ -299,9 +341,9 @@ cargo run -p rexdk --example reconnect
 
 ## Scope and limitations
 
-- Only the control connection is implemented. Server events are exposed through
-  `Client::take_event_stream`. Data connections (`/api/data`), which stream
-  block output, are not implemented.
+- Control connections and data connections (`/api/data`) are implemented.
+  Server events are exposed through `Client::take_event_stream` and block output
+  through `Client::open_data` or `Client::connect_data`.
 - Unix domain sockets, TCP, Tailscale, and Windows named pipes are supported
   through `Transport`. The default path is macOS-specific.
 - Automatic reconnection is not implemented; call `Client::reconnect` from your
