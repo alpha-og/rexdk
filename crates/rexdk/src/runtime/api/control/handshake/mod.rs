@@ -13,13 +13,11 @@ use tokio::time::timeout;
 use tokio_tungstenite::tungstenite;
 
 use crate::runtime::{
-    Client, Error,
-    api::Message,
-    connection::{CONTROL_SUBPROTOCOL, ControlStream},
+    Client, Error, api::Message, connection::CONTROL_SUBPROTOCOL, transport::Stream,
 };
 
 impl Client {
-    pub async fn handshake(&self, ws_stream: &mut ControlStream) -> Result<Welcome, Error> {
+    pub async fn handshake(&self, ws_stream: &mut Stream) -> Result<Welcome, Error> {
         let hello = Hello::new(self.reconnect_token.clone(), &self.config);
         let json = serde_json::to_string(&hello)?;
 
