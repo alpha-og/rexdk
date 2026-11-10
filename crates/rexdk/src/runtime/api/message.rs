@@ -1,4 +1,4 @@
-use crate::runtime::api::{Response, control::handshake::Welcome, events::EventMessage};
+use crate::runtime::api::{Response, control::Welcome, events::EventMessage};
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(tag = "type")]

@@ -1,6 +1,9 @@
 //! Why a Rex control connection ended.
 
-use crate::{Error, runtime::error::ConnectionError};
+use crate::{
+    Error,
+    runtime::connection::{ConnectionContext, ConnectionError, ConnectionErrorKind, ControlError},
+};
 
 /// Why a control connection ended.
 ///
@@ -51,7 +54,10 @@ pub enum DisconnectReason {
 impl DisconnectReason {
     /// Converts this reason into the error returned to callers whose requests
     /// were still pending when the connection ended.
-    pub fn to_error(&self) -> Error {
-        Error::Connection(ConnectionError::Disconnected(self.clone()))
+    pub fn to_error(&self, context: ConnectionContext) -> Error {
+        Error::Connection(ConnectionError::new(
+            context,
+            ConnectionErrorKind::Control(ControlError::Disconnected(self.clone())),
+        ))
     }
 }

@@ -11,11 +11,11 @@ use tokio_tungstenite::{
     tungstenite::{client::IntoClientRequest, http::header::SEC_WEBSOCKET_PROTOCOL},
 };
 
-use crate::{
-    Client, Error,
-    Transport::{NamedPipe, Tailscale, Tcp, UnixSocket},
-    runtime::error::ConnectionError,
-};
+use crate::Transport::{NamedPipe, Tailscale, Tcp, UnixSocket};
+
+mod error;
+
+pub use error::TransportError;
 
 pub trait AsyncStream: AsyncRead + AsyncWrite {}
 
@@ -161,22 +161,23 @@ fn connect_error(
     transport: &str,
     endpoint: impl std::fmt::Display,
     source: std::io::Error,
-) -> Error {
-    Error::Connection(ConnectionError::Connect {
-        transport: format!("{transport} {endpoint}"),
+) -> TransportError {
+    TransportError::Connect {
+        transport: transport.to_owned(),
+        endpoint: endpoint.to_string(),
         source,
-    })
+    }
 }
 
 /// Opens a WebSocket to a Rex endpoint over `transport`.
 ///
 /// This is used both for the control connection and for data connections,
-/// including the reconnects a data connection performs without a `Client`.
-pub(crate) async fn connect_transport(
+/// including the reconnects a data connection performs on its own.
+pub(crate) async fn connect(
     transport: &Transport,
     endpoint: &str,
     subprotocol: &str,
-) -> Result<Stream, Error> {
+) -> Result<Stream, TransportError> {
     let (stream, uri): (BoxedStream, String) =
         match transport {
             UnixSocket { path } => {
@@ -194,11 +195,10 @@ pub(crate) async fn connect_transport(
 
                 #[cfg(not(unix))]
                 {
-                    use crate::runtime::error::ConnectionError::UnsupportedTransport;
-                    return Err(Error::Connection(UnsupportedTransport {
+                    return Err(TransportError::Unsupported {
                         transport: "UnixSocket".into(),
                         platform: "Windows".into(),
-                    }));
+                    });
                 }
             }
             Tcp { host, port } => {
@@ -230,30 +230,36 @@ pub(crate) async fn connect_transport(
 
                 #[cfg(not(windows))]
                 {
-                    use crate::runtime::error::ConnectionError::UnsupportedTransport;
-
                     let _ = path;
-                    return Err(Error::Connection(UnsupportedTransport {
+                    return Err(TransportError::Unsupported {
                         transport: "NamedPipe".into(),
                         platform: "Non Windows".into(),
-                    }));
+                    });
                 }
             }
         };
-    let mut request = uri.into_client_request()?;
-    request
-        .headers_mut()
-        .insert(SEC_WEBSOCKET_PROTOCOL, subprotocol.parse()?);
-    let (ws, _) = client_async(request, stream).await?;
+    let mut request =
+        uri.clone()
+            .into_client_request()
+            .map_err(|source| TransportError::InvalidRequest {
+                endpoint: uri.clone(),
+                source,
+            })?;
+    request.headers_mut().insert(
+        SEC_WEBSOCKET_PROTOCOL,
+        subprotocol
+            .parse()
+            .map_err(|source| TransportError::InvalidSubprotocol {
+                subprotocol: subprotocol.to_owned(),
+                source,
+            })?,
+    );
+    let (ws, _) =
+        client_async(request, stream)
+            .await
+            .map_err(|source| TransportError::WebSocket {
+                endpoint: uri,
+                source,
+            })?;
     Ok(ws)
-}
-
-impl Client {
-    pub async fn create_transport(
-        &self,
-        endpoint: &str,
-        subprotocol: &str,
-    ) -> Result<Stream, Error> {
-        connect_transport(&self.config.transport, endpoint, subprotocol).await
-    }
 }

@@ -21,8 +21,6 @@
 //!
 //! The reconnect token is sensitive and must not be logged or exposed.
 //! Each WELCOME provides a new token; RESUME must use the latest token.
-//!
-//! Reference: Rex `llms.txt`, Data Connection → Handshake Messages.
 
 use bytes::Bytes;
 

@@ -1,7 +1,12 @@
-use crate::{DisconnectReason, runtime::transport::Stream};
-use crate::{Error, KeepAlive};
-
 use crate::runtime::api;
+use crate::runtime::api::control::{Hello, Welcome};
+use crate::runtime::config::ClientConfig;
+use crate::runtime::connection::{
+    ConnectionContext, ConnectionError, ConnectionErrorKind, ControlError, HANDSHAKE_TIMEOUT,
+    websocket_error,
+};
+use crate::runtime::transport::Stream;
+use crate::{DisconnectReason, Error, KeepAlive};
 
 use std::{
     collections::HashMap,
@@ -14,6 +19,7 @@ use std::{
 use tokio::{
     sync::{mpsc, oneshot, oneshot::Sender, watch},
     task::{AbortHandle, JoinHandle},
+    time::timeout,
 };
 
 use futures_util::{
@@ -37,12 +43,26 @@ pub struct ControlConnection {
     pub state: Arc<tokio::sync::Mutex<ConnectionState>>,
     /// Largest message the server accepts, from the welcome's `limits`.
     pub max_message_bytes: usize,
+    /// Identifies this control connection in errors.
+    pub context: ConnectionContext,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ConnectionState {
     pub pending_requests: HashMap<String, Sender<Result<Value, Error>>>,
     pub closed: Option<DisconnectReason>,
+    /// Identifies this control connection in errors.
+    pub context: ConnectionContext,
+}
+
+impl ConnectionState {
+    pub fn new(context: ConnectionContext) -> Self {
+        Self {
+            pending_requests: HashMap::new(),
+            closed: None,
+            context,
+        }
+    }
 }
 
 impl std::fmt::Debug for ControlConnection {
@@ -52,6 +72,7 @@ impl std::fmt::Debug for ControlConnection {
             .field("keepalive_task", &self.keepalive_task)
             .field("next_request_id", &self.next_request_id)
             .field("max_message_bytes", &self.max_message_bytes)
+            .field("context", &self.context)
             .field("state", &self.state)
             .finish_non_exhaustive()
     }
@@ -168,13 +189,16 @@ impl ControlConnection {
         reason: DisconnectReason,
         publish: bool,
     ) {
-        let pending: Vec<_> = {
+        let (context, pending): (ConnectionContext, Vec<_>) = {
             let mut guard = state.lock().await;
             if guard.closed.is_some() {
                 return;
             }
             guard.closed = Some(reason.clone());
-            guard.pending_requests.drain().map(|(_, tx)| tx).collect()
+            (
+                guard.context.clone(),
+                guard.pending_requests.drain().map(|(_, tx)| tx).collect(),
+            )
         };
 
         if publish {
@@ -182,7 +206,7 @@ impl ControlConnection {
         }
 
         for tx in pending {
-            let _ = tx.send(Err(reason.to_error()));
+            let _ = tx.send(Err(reason.to_error(context.clone())));
         }
     }
 
@@ -265,7 +289,20 @@ impl ControlConnection {
             });
         }
 
-        self.writer.lock().await.send(message).await?;
+        self.writer
+            .lock()
+            .await
+            .send(message)
+            .await
+            .map_err(|source| {
+                Error::Connection(ConnectionError::new(
+                    self.context.clone(),
+                    ConnectionErrorKind::Control(ControlError::Transport(websocket_error(
+                        &self.context,
+                        source,
+                    ))),
+                ))
+            })?;
         Ok(())
     }
 
@@ -287,7 +324,7 @@ impl ControlConnection {
         {
             let mut state = self.state.lock().await;
             if let Some(reason) = &state.closed {
-                return Err(reason.to_error());
+                return Err(reason.to_error(self.context.clone()));
             }
             state.pending_requests.insert(id.clone(), tx);
         }
@@ -300,5 +337,114 @@ impl ControlConnection {
         let payload = rx.await??;
 
         Ok(serde_json::from_value(payload)?)
+    }
+}
+
+/// Sends HELLO and waits for WELCOME on a control connection.
+pub(crate) async fn handshake(
+    config: &ClientConfig,
+    reconnect_token: Option<String>,
+    stream: &mut Stream,
+    context: &ConnectionContext,
+) -> Result<Welcome, ConnectionError> {
+    let hello = Hello::new(reconnect_token, config);
+    let json = serde_json::to_string(&hello).map_err(|err| {
+        ConnectionError::new(
+            context.clone(),
+            ConnectionErrorKind::Control(ControlError::InvalidHandshake(err.to_string())),
+        )
+    })?;
+
+    let message = timeout(HANDSHAKE_TIMEOUT, async {
+        stream
+            .send(tungstenite::Message::Text(json.into()))
+            .await
+            .map_err(|source| {
+                ConnectionError::new(
+                    context.clone(),
+                    ConnectionErrorKind::Control(ControlError::Transport(websocket_error(
+                        context, source,
+                    ))),
+                )
+            })?;
+
+        match stream.next().await {
+            Some(Ok(message)) => Ok::<_, ConnectionError>(message),
+            Some(Err(source)) => Err(ConnectionError::new(
+                context.clone(),
+                ConnectionErrorKind::Control(ControlError::Transport(websocket_error(
+                    context, source,
+                ))),
+            )),
+            None => Err(ConnectionError::new(
+                context.clone(),
+                ConnectionErrorKind::Control(ControlError::Closed),
+            )),
+        }
+    })
+    .await
+    .map_err(|_| {
+        ConnectionError::new(
+            context.clone(),
+            ConnectionErrorKind::Control(ControlError::Timeout {
+                seconds: HANDSHAKE_TIMEOUT.as_secs(),
+            }),
+        )
+    })??;
+
+    let welcome = match message {
+        tungstenite::Message::Text(text) => {
+            match serde_json::from_slice::<api::Message>(text.as_bytes()) {
+                Ok(api::Message::Welcome(welcome)) => welcome,
+                Ok(_) => {
+                    return Err(ConnectionError::new(
+                        context.clone(),
+                        ConnectionErrorKind::Control(ControlError::UnexpectedMessage(
+                            "non-welcome message during the control handshake".into(),
+                        )),
+                    ));
+                }
+                Err(err) => {
+                    return Err(ConnectionError::new(
+                        context.clone(),
+                        ConnectionErrorKind::Control(ControlError::InvalidHandshake(format!(
+                            "invalid welcome: {err}"
+                        ))),
+                    ));
+                }
+            }
+        }
+        other => {
+            return Err(ConnectionError::new(
+                context.clone(),
+                ConnectionErrorKind::Control(ControlError::UnexpectedMessage(format!(
+                    "{} message during the control handshake",
+                    message_name(&other)
+                ))),
+            ));
+        }
+    };
+
+    if welcome.protocol != CONTROL_SUBPROTOCOL {
+        return Err(ConnectionError::new(
+            context.clone(),
+            ConnectionErrorKind::Control(ControlError::InvalidHandshake(format!(
+                "expected protocol {CONTROL_SUBPROTOCOL}, got {}",
+                welcome.protocol
+            ))),
+        ));
+    }
+
+    Ok(welcome)
+}
+
+fn message_name(message: &tungstenite::Message) -> &'static str {
+    match message {
+        tungstenite::Message::Text(_) => "text",
+        tungstenite::Message::Binary(_) => "binary",
+        tungstenite::Message::Ping(_) => "ping",
+        tungstenite::Message::Pong(_) => "pong",
+        tungstenite::Message::Close(_) => "close",
+        tungstenite::Message::Frame(_) => "frame",
     }
 }

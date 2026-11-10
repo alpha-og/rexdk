@@ -41,19 +41,17 @@ use crate::{
     runtime::{
         api::data::{Hello, Message, RECONNECT_TOKEN_LEN, Resume, TICKET_LEN, Welcome},
         data_stream::DataStream,
-        error::DataError,
-        transport::{Stream, Transport, connect_transport},
+        transport::{Stream, Transport},
     },
+};
+
+use super::{
+    ConnectionContext, ConnectionError, ConnectionErrorKind, ConnectionPhase, DataError,
+    HANDSHAKE_TIMEOUT, connect, websocket_error,
 };
 
 pub const DATA_ENDPOINT: &str = "/api/data";
 pub const DATA_BUFFER_CAPACITY: usize = 64;
-
-/// Time allowed for HELLO/RESUME and the server's answer.
-const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
-
-/// Time allowed for a reconnect transport to open.
-const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Time allowed for the worker to send its closing frame.
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(1);
@@ -69,6 +67,13 @@ const RECONNECT_BACKOFF_MAX: Duration = Duration::from_secs(2);
 pub(crate) struct DataConnectContext {
     pub transport: Transport,
     pub subprotocol: String,
+}
+
+impl DataConnectContext {
+    /// Builds the shared error context for this data connection.
+    fn connection_context(&self, phase: ConnectionPhase) -> ConnectionContext {
+        ConnectionContext::new(DATA_ENDPOINT, phase)
+    }
 }
 
 /// A cloneable handle to a running data connection.
@@ -95,14 +100,23 @@ struct Connection {
 impl DataStream {
     /// Opens a data connection and starts its worker.
     ///
-    /// The handshake is performed before this returns, so a refusal is
-    /// reported as an error from the call rather than as a stream item.
+    /// The transport and the HELLO/WELCOME handshake are both completed before
+    /// this returns, so a refusal is reported as an error from the call rather
+    /// than as a stream item.
     pub(crate) async fn create(
         context: DataConnectContext,
         ticket: [u8; TICKET_LEN],
-        mut stream: Stream,
     ) -> Result<(Self, DataStreamHandle), Error> {
-        let welcome = handshake(&mut stream, Hello::new(ticket)).await?;
+        let handshake_context = context.connection_context(ConnectionPhase::Handshake);
+        let mut stream = connect(&context.transport, DATA_ENDPOINT, &context.subprotocol)
+            .await
+            .map_err(|source| {
+                ConnectionError::new(
+                    handshake_context.clone(),
+                    ConnectionErrorKind::Data(DataError::Transport(source)),
+                )
+            })?;
+        let welcome = handshake(&mut stream, Hello::new(ticket), &handshake_context).await?;
 
         let (data_tx, data_rx) = mpsc::channel(DATA_BUFFER_CAPACITY);
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
@@ -210,31 +224,83 @@ impl Drop for DataStreamHandleInner {
 }
 
 /// Sends HELLO and waits for WELCOME or REJECT.
-async fn handshake(stream: &mut Stream, hello: Hello) -> Result<Welcome, Error> {
+async fn handshake(
+    stream: &mut Stream,
+    hello: Hello,
+    context: &ConnectionContext,
+) -> Result<Welcome, Error> {
     let message = timeout(HANDSHAKE_TIMEOUT, async {
         stream
             .send(tungstenite::Message::Binary(Bytes::from(hello)))
-            .await?;
+            .await
+            .map_err(|source| {
+                ConnectionError::new(
+                    context.clone(),
+                    ConnectionErrorKind::Data(DataError::Transport(websocket_error(
+                        context, source,
+                    ))),
+                )
+            })?;
 
         match stream.next().await {
-            Some(Ok(message)) => Ok::<_, Error>(message),
-            Some(Err(err)) => Err(err.into()),
-            None => Err(DataError::Handshake("connection closed".into()).into()),
+            Some(Ok(message)) => Ok::<_, ConnectionError>(message),
+            Some(Err(source)) => Err(ConnectionError::new(
+                context.clone(),
+                ConnectionErrorKind::Data(DataError::Transport(websocket_error(context, source))),
+            )),
+            None => Err(ConnectionError::new(
+                context.clone(),
+                ConnectionErrorKind::Data(DataError::Handshake("connection closed".into())),
+            )),
         }
     })
     .await
-    .map_err(|_| Error::Data(DataError::HandshakeTimeout))??;
+    .map_err(|_| {
+        ConnectionError::new(
+            context.clone(),
+            ConnectionErrorKind::Data(DataError::Timeout {
+                seconds: HANDSHAKE_TIMEOUT.as_secs(),
+            }),
+        )
+    })??;
 
     match message {
-        tungstenite::Message::Binary(bytes) => match Message::try_from(bytes)? {
-            Message::Welcome(welcome) => Ok(welcome),
-            Message::Reject(reject) => Err(DataError::Rejected(reject.reason()).into()),
-            _ => Err(DataError::Handshake("unexpected handshake message".into()).into()),
-        },
-        tungstenite::Message::Close(frame) => {
-            Err(DataError::Handshake(close_description(frame)).into())
+        tungstenite::Message::Binary(bytes) => {
+            let message = Message::try_from(bytes).map_err(|err| {
+                ConnectionError::new(
+                    context.clone(),
+                    ConnectionErrorKind::Data(DataError::Protocol(err)),
+                )
+            })?;
+
+            match message {
+                Message::Welcome(welcome) => Ok(welcome),
+                Message::Reject(reject) => Err(ConnectionError::new(
+                    context.clone(),
+                    ConnectionErrorKind::Data(DataError::Rejected(reject.reason())),
+                )
+                .into()),
+                _ => Err(ConnectionError::new(
+                    context.clone(),
+                    ConnectionErrorKind::Data(DataError::Handshake(
+                        "unexpected handshake message".into(),
+                    )),
+                )
+                .into()),
+            }
         }
-        _ => Err(DataError::Handshake("unexpected message during handshake".into()).into()),
+        tungstenite::Message::Close(frame) => Err(ConnectionError::new(
+            context.clone(),
+            ConnectionErrorKind::Data(DataError::Handshake(close_description(frame))),
+        )
+        .into()),
+        _ => Err(ConnectionError::new(
+            context.clone(),
+            ConnectionErrorKind::Data(DataError::Handshake(
+                "unexpected message during handshake".into(),
+            )),
+        )
+        .into()),
     }
 }
 
@@ -315,7 +381,8 @@ impl Worker {
                         received_bytes.fetch_add(len, Ordering::Relaxed);
                     }
                     Some(Ok(tungstenite::Message::Close(frame))) => {
-                        return classify_close(frame);
+                        let context = self.context.connection_context(ConnectionPhase::Stream);
+                        return classify_close(frame, &context);
                     }
                     // Tungstenite answers pings automatically while reading.
                     Some(Ok(_)) => {}
@@ -331,6 +398,7 @@ impl Worker {
 
     /// Reconnects and resumes the stream until the retention window closes.
     async fn resume(&mut self) -> ResumeOutcome {
+        let context = self.context.connection_context(ConnectionPhase::Resume);
         let deadline = Instant::now() + self.resume_timeout;
         let mut delay = RECONNECT_BACKOFF_MIN;
         let mut attempted = false;
@@ -341,7 +409,13 @@ impl Worker {
             }
 
             if attempted && Instant::now() >= deadline {
-                return ResumeOutcome::Failed(DataError::ResumeWindowElapsed.into());
+                return ResumeOutcome::Failed(
+                    ConnectionError::new(
+                        context.clone(),
+                        ConnectionErrorKind::Data(DataError::ResumeWindowElapsed),
+                    )
+                    .into(),
+                );
             }
             attempted = true;
 
@@ -354,7 +428,13 @@ impl Worker {
 
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
-                return ResumeOutcome::Failed(DataError::ResumeWindowElapsed.into());
+                return ResumeOutcome::Failed(
+                    ConnectionError::new(
+                        context.clone(),
+                        ConnectionErrorKind::Data(DataError::ResumeWindowElapsed),
+                    )
+                    .into(),
+                );
             }
 
             if !self.wait_or_shutdown(delay.min(remaining)).await {
@@ -370,17 +450,12 @@ impl Worker {
         let transport = self.context.transport.clone();
         let subprotocol = self.context.subprotocol.clone();
 
-        let connect = timeout(
-            CONNECT_TIMEOUT,
-            connect_transport(&transport, DATA_ENDPOINT, &subprotocol),
-        );
-
         let stream = tokio::select! {
             biased;
             _ = self.shutdown.changed() => return ResumeAttempt::Shutdown,
-            result = connect => match result {
-                Ok(Ok(stream)) => stream,
-                Ok(Err(_)) | Err(_) => return ResumeAttempt::Retry,
+            result = connect(&transport, DATA_ENDPOINT, &subprotocol) => match result {
+                Ok(stream) => stream,
+                Err(_) => return ResumeAttempt::Retry,
             },
         };
 
@@ -388,6 +463,7 @@ impl Worker {
     }
 
     async fn resume_handshake(&mut self, mut stream: Stream) -> ResumeAttempt {
+        let context = self.context.connection_context(ConnectionPhase::Resume);
         let token = self.reconnect_token;
         let received = self.received_bytes.load(Ordering::Relaxed);
         let resume = Resume::new(token, received);
@@ -398,12 +474,32 @@ impl Worker {
             result = timeout(HANDSHAKE_TIMEOUT, async {
                 stream
                     .send(tungstenite::Message::Binary(Bytes::from(resume)))
-                    .await?;
+                    .await
+                    .map_err(|source| {
+                        ConnectionError::new(
+                            context.clone(),
+                            ConnectionErrorKind::Data(DataError::Transport(websocket_error(
+                                &context, source,
+                            ))),
+                        )
+                    })?;
 
                 match stream.next().await {
                     Some(Ok(message)) => Ok::<_, Error>(message),
-                    Some(Err(err)) => Err(err.into()),
-                    None => Err(DataError::Handshake("connection closed".into()).into()),
+                    Some(Err(source)) => Err(ConnectionError::new(
+                        context.clone(),
+                        ConnectionErrorKind::Data(DataError::Transport(websocket_error(
+                            &context, source,
+                        ))),
+                    )
+                    .into()),
+                    None => Err(ConnectionError::new(
+                        context.clone(),
+                        ConnectionErrorKind::Data(DataError::Handshake(
+                            "connection closed".into(),
+                        )),
+                    )
+                    .into()),
                 }
             }) => result,
         };
@@ -422,17 +518,39 @@ impl Worker {
                         .store(welcome.channel_nonce, Ordering::Relaxed);
                     ResumeAttempt::Stream(stream)
                 }
-                Ok(Message::Reject(reject)) => {
-                    ResumeAttempt::Failed(DataError::Rejected(reject.reason()).into())
-                }
-                Ok(_) => ResumeAttempt::Failed(
-                    DataError::Handshake("unexpected handshake message".into()).into(),
+                Ok(Message::Reject(reject)) => ResumeAttempt::Failed(
+                    ConnectionError::new(
+                        context.clone(),
+                        ConnectionErrorKind::Data(DataError::Rejected(reject.reason())),
+                    )
+                    .into(),
                 ),
-                Err(err) => ResumeAttempt::Failed(err.into()),
+                Ok(_) => ResumeAttempt::Failed(
+                    ConnectionError::new(
+                        context.clone(),
+                        ConnectionErrorKind::Data(DataError::Handshake(
+                            "unexpected handshake message".into(),
+                        )),
+                    )
+                    .into(),
+                ),
+                Err(err) => ResumeAttempt::Failed(
+                    ConnectionError::new(
+                        context.clone(),
+                        ConnectionErrorKind::Data(DataError::Protocol(err)),
+                    )
+                    .into(),
+                ),
             },
             tungstenite::Message::Close(_) | tungstenite::Message::Ping(_) => ResumeAttempt::Retry,
             _ => ResumeAttempt::Failed(
-                DataError::Handshake("unexpected message during handshake".into()).into(),
+                ConnectionError::new(
+                    context.clone(),
+                    ConnectionErrorKind::Data(DataError::Handshake(
+                        "unexpected message during handshake".into(),
+                    )),
+                )
+                .into(),
             ),
         }
     }
@@ -474,7 +592,7 @@ enum ResumeAttempt {
     Failed(Error),
 }
 
-fn classify_close(frame: Option<CloseFrame>) -> StreamEnd {
+fn classify_close(frame: Option<CloseFrame>, context: &ConnectionContext) -> StreamEnd {
     let Some(frame) = frame else {
         return StreamEnd::Resume;
     };
@@ -486,9 +604,21 @@ fn classify_close(frame: Option<CloseFrame>) -> StreamEnd {
         // The stream ended, or the block closed and must not be reconnected.
         1000 | 4000 => StreamEnd::StreamEnded,
         // The server requires a fresh ticket and HELLO.
-        1013 => StreamEnd::Fatal(DataError::ReconnectRequired { code, reason }.into()),
+        1013 => StreamEnd::Fatal(
+            ConnectionError::new(
+                context.clone(),
+                ConnectionErrorKind::Data(DataError::ReconnectRequired { code, reason }),
+            )
+            .into(),
+        ),
         // These cannot be resumed.
-        1008 | 1011 => StreamEnd::Fatal(DataError::Closed { code, reason }.into()),
+        1008 | 1011 => StreamEnd::Fatal(
+            ConnectionError::new(
+                context.clone(),
+                ConnectionErrorKind::Data(DataError::Closed { code, reason }),
+            )
+            .into(),
+        ),
         // Keepalive timeouts, provider cancellations, and anything unknown
         // leave the stream waiting for a resume.
         _ => StreamEnd::Resume,

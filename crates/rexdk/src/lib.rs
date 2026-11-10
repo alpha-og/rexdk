@@ -3,6 +3,7 @@ pub mod runtime;
 
 pub use bindings::metadata;
 pub use runtime::{
-    Client, ClientConfig, DataError, DataStream, DataStreamHandle, DisconnectReason, Error,
-    EventStream, KeepAlive, Transport, decode_ticket, events,
+    Client, ClientConfig, ConnectionContext, ConnectionError, ConnectionErrorKind, ConnectionPhase,
+    ControlError, DataError, DataStream, DataStreamHandle, DisconnectReason, Error, EventStream,
+    KeepAlive, Transport, TransportError, decode_ticket, events,
 };

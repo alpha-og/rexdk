@@ -9,12 +9,15 @@ mod transport;
 
 pub use api::{data::decode_ticket, events};
 pub use config::{ClientConfig, KeepAlive};
-pub use connection::DataStreamHandle;
+pub use connection::{
+    ConnectionContext, ConnectionError, ConnectionErrorKind, ConnectionPhase, ControlError,
+    DataError, DataStreamHandle,
+};
 pub use data_stream::DataStream;
 pub use disconnect::DisconnectReason;
-pub use error::{DataError, Error};
+pub use error::Error;
 pub use event_stream::EventStream;
-pub use transport::Transport;
+pub use transport::{Transport, TransportError};
 
 use std::sync::{Arc, atomic::AtomicU64};
 
@@ -26,7 +29,7 @@ use crate::{
     events::EventMessage,
     runtime::connection::{
         CONTROL_ENDPOINT, CONTROL_SUBPROTOCOL, ConnectionState, ControlConnection, DATA_ENDPOINT,
-        DataConnectContext,
+        DataConnectContext, connect as open_connection, control_handshake,
     },
 };
 
@@ -87,14 +90,34 @@ impl Client {
     }
 
     async fn connect_inner(&mut self) -> Result<(), Error> {
-        let mut control_stream = self
-            .create_transport(CONTROL_ENDPOINT, CONTROL_SUBPROTOCOL)
-            .await?;
-        let welcome = self.handshake(&mut control_stream).await?;
+        let context = ConnectionContext::new(CONTROL_ENDPOINT, ConnectionPhase::Handshake);
+        let mut control_stream = open_connection(
+            &self.config.transport,
+            CONTROL_ENDPOINT,
+            CONTROL_SUBPROTOCOL,
+        )
+        .await
+        .map_err(|source| {
+            ConnectionError::new(
+                context.clone(),
+                ConnectionErrorKind::Control(ControlError::Transport(source)),
+            )
+        })?;
+
+        let welcome = control_handshake(
+            &self.config,
+            self.reconnect_token.clone(),
+            &mut control_stream,
+            &context,
+        )
+        .await?;
         let max_message_bytes = welcome.limits.max_message_bytes;
         let (writer, reader) = control_stream.split();
 
-        let state = Arc::new(tokio::sync::Mutex::new(ConnectionState::default()));
+        let stream_context = context.with_phase(ConnectionPhase::Stream);
+        let state = Arc::new(tokio::sync::Mutex::new(ConnectionState::new(
+            stream_context.clone(),
+        )));
         let (pongs_tx, pongs_rx) = watch::channel(0u64);
         let writer = Arc::new(tokio::sync::Mutex::new(writer));
 
@@ -137,6 +160,7 @@ impl Client {
             next_request_id: AtomicU64::new(1),
             state,
             max_message_bytes,
+            context: stream_context,
         });
 
         Ok(())
@@ -322,13 +346,12 @@ impl Client {
         // Finished workers stay in the list until the next connection opens.
         self.data_streams.retain(|handle| !handle.is_finished());
 
-        let stream = self.create_transport(DATA_ENDPOINT, subprotocol).await?;
         let context = DataConnectContext {
             transport: self.config.transport.clone(),
             subprotocol: subprotocol.to_owned(),
         };
 
-        let (data_stream, handle) = DataStream::create(context, ticket, stream).await?;
+        let (data_stream, handle) = DataStream::create(context, ticket).await?;
         self.data_streams.push(handle.clone());
 
         Ok((data_stream, handle))
@@ -343,11 +366,21 @@ impl Client {
         params: crate::bindings::data::ConnectParams,
     ) -> Result<(DataStream, DataStreamHandle), Error> {
         let Some(subprotocol) = params.subprotocol.clone() else {
-            return Err(DataError::MissingSubprotocol.into());
+            let context = ConnectionContext::new(DATA_ENDPOINT, ConnectionPhase::Handshake);
+            return Err(ConnectionError::new(
+                context,
+                ConnectionErrorKind::Data(DataError::MissingSubprotocol),
+            )
+            .into());
         };
 
         let output = crate::bindings::data::connect(self, params).await?;
-        let ticket = decode_ticket(&output.ticket)?;
+        let ticket = decode_ticket(&output.ticket).map_err(|err| {
+            ConnectionError::new(
+                ConnectionContext::new(DATA_ENDPOINT, ConnectionPhase::Handshake),
+                ConnectionErrorKind::Data(DataError::Protocol(err)),
+            )
+        })?;
 
         self.connect_data(ticket, &subprotocol).await
     }
@@ -383,10 +416,11 @@ impl Client {
 
     fn connection(&self) -> Result<&ControlConnection, Error> {
         self.connection.as_ref().ok_or_else(|| {
+            let context = ConnectionContext::new(CONTROL_ENDPOINT, ConnectionPhase::Stream);
             self.disconnect_rx
                 .borrow()
                 .clone()
-                .map_or(Error::NotConnected, |reason| reason.to_error())
+                .map_or(Error::NotConnected, |reason| reason.to_error(context))
         })
     }
 }

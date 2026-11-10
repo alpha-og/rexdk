@@ -225,6 +225,13 @@ sequences. Dropping the stream asks the worker to close with status 1000;
 connections before the control connection, and `Client::disconnect_data` closes
 only the data connections.
 
+Data-connection failures are `Error::Connection` with a
+`ConnectionErrorKind::Data` kind. The context names the endpoint and phase
+(handshake, resume, or stream), while `DataError` distinguishes rejection,
+a closed stream, a reconnect requirement, and an elapsed resume window.
+Transport failures use `TransportError` and name the transport, endpoint, and
+underlying I/O or WebSocket cause.
+
 ## Staying connected
 
 The server pings the client every 120 seconds and closes the connection with
@@ -324,9 +331,10 @@ async fn connect_and_query() -> Result<(), Error> {
 server, serialization errors, and configuration errors. API errors carry the
 server's `code`, HTTP-style `status`, and `message`. Requests that were pending
 when a connection ended fail with `Error::Connection`, whose
-`ConnectionError::Disconnected` holds the `DisconnectReason`. A request larger
-than the welcome's `limits.max_message_bytes` fails with
-`Error::MessageTooLarge` before anything is sent.
+`ConnectionError` carries a `ConnectionErrorKind::Control` with the
+`DisconnectReason`, plus the connection context. A request larger than the
+welcome's `limits.max_message_bytes` fails with `Error::MessageTooLarge` before
+anything is sent.
 
 ## Examples
 
