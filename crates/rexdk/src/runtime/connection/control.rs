@@ -219,13 +219,14 @@ impl ControlConnection {
         loop {
             match reader.next().await {
                 Some(Ok(tungstenite::Message::Text(text))) => {
-                    let Ok(message) = serde_json::from_str::<api::Message>(text.as_str()) else {
+                    let Ok(message) = serde_json::from_str::<api::ControlMessage>(text.as_str())
+                    else {
                         // A single malformed frame does not invalidate the
                         // connection; keep serving subsequent messages.
                         continue;
                     };
                     match message {
-                        api::Message::Response(response) => {
+                        api::ControlMessage::Response(response) => {
                             let tx = state.lock().await.pending_requests.remove(&response.id);
                             if let Some(tx) = tx {
                                 let result = match (response.payload, response.error) {
@@ -239,12 +240,15 @@ impl ControlConnection {
                                 let _ = tx.send(result);
                             }
                         }
-                        api::Message::Event(event) => {
+                        api::ControlMessage::Event(event) => {
                             // If the consumer dropped the event stream, stop
                             // forwarding events but keep serving responses.
                             let _ = event_tx.send(event).await;
                         }
-                        api::Message::Welcome(_) | api::Message::Unknown => {}
+                        api::ControlMessage::Hello(_)
+                        | api::ControlMessage::Request(_)
+                        | api::ControlMessage::Welcome(_)
+                        | api::ControlMessage::Unknown => {}
                     }
                 }
                 Some(Ok(tungstenite::Message::Pong(_))) => {
@@ -316,7 +320,7 @@ impl ControlConnection {
             .try_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1))
             .map_err(|_| Error::RequestIdExhausted)?
             .to_string();
-        let req = api::Request::new(&id, method, params);
+        let req = api::control::Request::new(&id, method, params);
         let json = serde_json::to_string(&req)?;
 
         let (tx, rx) = oneshot::channel();
@@ -394,8 +398,8 @@ pub(crate) async fn handshake(
 
     let welcome = match message {
         tungstenite::Message::Text(text) => {
-            match serde_json::from_slice::<api::Message>(text.as_bytes()) {
-                Ok(api::Message::Welcome(welcome)) => welcome,
+            match serde_json::from_slice::<api::ControlMessage>(text.as_bytes()) {
+                Ok(api::ControlMessage::Welcome(welcome)) => welcome,
                 Ok(_) => {
                     return Err(ConnectionError::new(
                         context.clone(),

@@ -2,6 +2,15 @@ use serde::Serialize;
 
 use crate::runtime::config::{ClientConfig, ClientKind, Platform};
 
+/// A client-to-server control HELLO.
+///
+/// HELLO is the first message on `/api/control` and must be sent within 5
+/// seconds of opening the WebSocket. A client sends exactly one, then only
+/// requests.
+///
+/// `reconnect_token` continues an existing client; leave it out to start a
+/// new one. The token is sensitive: never log it, and keep the whole hello
+/// under 512 bytes uncompressed so compression cannot leak it.
 #[derive(Debug, Default, Serialize)]
 pub struct Hello {
     r#type: String,

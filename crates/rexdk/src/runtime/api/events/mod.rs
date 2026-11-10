@@ -28,9 +28,14 @@ pub use session::{
 };
 
 /// A control-connection `event` message.
+///
+/// The server sends events without a request. `seq` starts at 1 and goes up by
+/// one for each event on the connection, so a gap means an event was dropped.
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct EventMessage {
+    /// Event's place in the connection's event sequence.
     pub seq: u64,
+    /// The event, with its own `type` and `payload`.
     pub payload: Event,
 }
 
@@ -178,11 +183,11 @@ fn raw_event(value: &Value) -> RawEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::runtime::api::Message;
+    use crate::runtime::api::ControlMessage;
 
     fn decode(json: &str) -> EventMessage {
-        match serde_json::from_str::<Message>(json).expect("message decodes") {
-            Message::Event(event) => event,
+        match serde_json::from_str::<ControlMessage>(json).expect("message decodes") {
+            ControlMessage::Event(event) => event,
             other => panic!("expected an event message, got {other:?}"),
         }
     }

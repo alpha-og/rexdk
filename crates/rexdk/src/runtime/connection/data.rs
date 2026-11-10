@@ -39,7 +39,10 @@ use tokio_tungstenite::tungstenite::{
 use crate::{
     Error,
     runtime::{
-        api::data::{Hello, Message, RECONNECT_TOKEN_LEN, Resume, TICKET_LEN, Welcome},
+        api::{
+            DataMessage,
+            data::{Hello, RECONNECT_TOKEN_LEN, Resume, TICKET_LEN, Welcome},
+        },
         data_stream::DataStream,
         transport::{Stream, Transport},
     },
@@ -266,7 +269,7 @@ async fn handshake(
 
     match message {
         tungstenite::Message::Binary(bytes) => {
-            let message = Message::try_from(bytes).map_err(|err| {
+            let message = DataMessage::try_from(bytes).map_err(|err| {
                 ConnectionError::new(
                     context.clone(),
                     ConnectionErrorKind::Data(DataError::Protocol(err)),
@@ -274,8 +277,8 @@ async fn handshake(
             })?;
 
             match message {
-                Message::Welcome(welcome) => Ok(welcome),
-                Message::Reject(reject) => Err(ConnectionError::new(
+                DataMessage::Welcome(welcome) => Ok(welcome),
+                DataMessage::Reject(reject) => Err(ConnectionError::new(
                     context.clone(),
                     ConnectionErrorKind::Data(DataError::Rejected(reject.reason())),
                 )
@@ -511,14 +514,14 @@ impl Worker {
         };
 
         match message {
-            tungstenite::Message::Binary(bytes) => match Message::try_from(bytes) {
-                Ok(Message::Welcome(welcome)) => {
+            tungstenite::Message::Binary(bytes) => match DataMessage::try_from(bytes) {
+                Ok(DataMessage::Welcome(welcome)) => {
                     self.reconnect_token = welcome.reconnect_token;
                     self.channel_nonce
                         .store(welcome.channel_nonce, Ordering::Relaxed);
                     ResumeAttempt::Stream(stream)
                 }
-                Ok(Message::Reject(reject)) => ResumeAttempt::Failed(
+                Ok(DataMessage::Reject(reject)) => ResumeAttempt::Failed(
                     ConnectionError::new(
                         context.clone(),
                         ConnectionErrorKind::Data(DataError::Rejected(reject.reason())),
