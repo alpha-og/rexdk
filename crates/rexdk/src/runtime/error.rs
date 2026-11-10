@@ -1,7 +1,10 @@
 use tokio_tungstenite::tungstenite::{error::ProtocolError, http};
 
 use super::{
-    api::{HandshakeError, ResponseError},
+    api::{
+        HandshakeError, ResponseError,
+        data::{DataMessageError, RejectReason},
+    },
     disconnect::DisconnectReason,
 };
 
@@ -33,6 +36,9 @@ pub enum Error {
 
     #[error(transparent)]
     Connection(#[from] ConnectionError),
+
+    #[error(transparent)]
+    Data(#[from] DataError),
 
     #[error("Configuration error: {0}")]
     Configuration(#[source] anyhow::Error),
@@ -120,4 +126,56 @@ impl From<tokio::sync::mpsc::error::SendError<super::events::EventMessage>> for 
     fn from(_: tokio::sync::mpsc::error::SendError<super::events::EventMessage>) -> Self {
         Self::EventChannelClosed
     }
+}
+
+impl From<DataMessageError> for Error {
+    fn from(err: DataMessageError) -> Self {
+        Self::Data(DataError::Protocol(err))
+    }
+}
+
+/// Errors specific to data connections.
+#[derive(Debug, thiserror::Error)]
+pub enum DataError {
+    /// The server refused the data-connection handshake.
+    #[error("data connection rejected: {0}")]
+    Rejected(RejectReason),
+
+    /// The server did not answer a HELLO or RESUME in time.
+    #[error("data connection handshake timed out")]
+    HandshakeTimeout,
+
+    /// The handshake ended without a valid WELCOME, REJECT, or data message.
+    #[error("data connection handshake failed: {0}")]
+    Handshake(String),
+
+    /// The server closed the connection and the stream cannot be resumed.
+    #[error("data connection closed with status {code}: {reason}")]
+    Closed {
+        /// WebSocket close status.
+        code: u16,
+        /// Human-readable reason sent with the close frame.
+        reason: String,
+    },
+
+    /// The server requires a fresh ticket and HELLO to continue the stream.
+    #[error("the data stream requires a new connection (status {code}: {reason})")]
+    ReconnectRequired {
+        /// WebSocket close status.
+        code: u16,
+        /// Human-readable reason sent with the close frame.
+        reason: String,
+    },
+
+    /// The stream is no longer retained by the server for resumption.
+    #[error("the data stream is no longer available for resumption")]
+    ResumeWindowElapsed,
+
+    /// `data.connect` returned a ticket without naming a subprotocol.
+    #[error("data.connect did not specify a subprotocol for the data connection")]
+    MissingSubprotocol,
+
+    /// A handshake message was malformed.
+    #[error(transparent)]
+    Protocol(#[from] DataMessageError),
 }
