@@ -621,6 +621,19 @@ fn classify_close(frame: Option<CloseFrame>, context: &ConnectionContext) -> Str
     match code {
         // The stream ended, or the block closed and must not be reconnected.
         1000 | 4000 => StreamEnd::StreamEnded,
+        // The provider ended the stream; there is nothing left to resume.
+        1001 if reason == "data provider canceled" => StreamEnd::StreamEnded,
+        // Keepalive timeouts and unrecognized statuses leave the stream
+        // waiting for a resume.
+        1001 => StreamEnd::Resume,
+        // A rejected handshake cannot be resumed.
+        1002 => StreamEnd::Fatal(
+            ConnectionError::new(
+                context.clone(),
+                ConnectionErrorKind::Data(DataError::Closed { code, reason }),
+            )
+            .into(),
+        ),
         // The server requires a fresh ticket and HELLO.
         1013 => StreamEnd::Fatal(
             ConnectionError::new(
@@ -637,8 +650,7 @@ fn classify_close(frame: Option<CloseFrame>, context: &ConnectionContext) -> Str
             )
             .into(),
         ),
-        // Keepalive timeouts, provider cancellations, and anything unknown
-        // leave the stream waiting for a resume.
+        // Anything else leaves the stream waiting for a resume.
         _ => StreamEnd::Resume,
     }
 }
