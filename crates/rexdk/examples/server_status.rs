@@ -5,7 +5,7 @@ use rexdk::bindings::server::{StatusParams, status};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = Client::new(None);
     client.connect().await?;
-    let status = status(&client, StatusParams {}).await?;
+    let (status, _) = status(&client, StatusParams {}).await?;
 
     println!(
         "Rex server {} is running (pid {})",
