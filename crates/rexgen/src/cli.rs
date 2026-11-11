@@ -221,10 +221,10 @@ async fn update_schema(
     };
     let mut client = rexdk::Client::new(Some(client_config));
     client.connect().await?;
-    let help = client
+    let (help, _) = client
         .invoke::<(), serde_json::Value>("help.all", None)
         .await?;
-    let server_version = client
+    let (server_version, _) = client
         .invoke::<(), ServerVersion>("server.version", None)
         .await
         .context("fetching server version")?;

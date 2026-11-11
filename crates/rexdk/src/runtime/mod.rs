@@ -374,7 +374,7 @@ impl Client {
             .into());
         };
 
-        let output = crate::bindings::data::connect(self, params).await?;
+        let (output, _) = crate::bindings::data::connect(self, params).await?;
         let ticket = decode_ticket(&output.ticket).map_err(|err| {
             ConnectionError::new(
                 ConnectionContext::new(DATA_ENDPOINT, ConnectionPhase::Handshake),
@@ -406,7 +406,7 @@ impl Client {
             .ok_or(Error::EventStreamTaken)
     }
 
-    pub async fn invoke<P, R>(&self, method: &str, params: Option<P>) -> Result<R, Error>
+    pub async fn invoke<P, R>(&self, method: &str, params: Option<P>) -> Result<(R, u64), Error>
     where
         P: Serialize,
         R: DeserializeOwned,

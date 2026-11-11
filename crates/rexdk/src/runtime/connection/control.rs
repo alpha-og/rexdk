@@ -49,7 +49,7 @@ pub struct ControlConnection {
 
 #[derive(Debug)]
 pub struct ConnectionState {
-    pub pending_requests: HashMap<String, Sender<Result<Value, Error>>>,
+    pub pending_requests: HashMap<String, Sender<Result<(Value, u64), Error>>>,
     pub closed: Option<DisconnectReason>,
     /// Identifies this control connection in errors.
     pub context: ConnectionContext,
@@ -240,8 +240,9 @@ impl ControlConnection {
                         protocol::ControlMessage::Response(response) => {
                             let tx = state.lock().await.pending_requests.remove(&response.id);
                             if let Some(tx) = tx {
+                                let seq = response.seq;
                                 let result = match (response.payload, response.error) {
-                                    (Some(payload), _) => Ok(payload),
+                                    (Some(payload), _) => Ok((payload, seq)),
                                     (None, Some(error)) => Err(error.into()),
                                     (None, None) => Err(Error::Protocol(format!(
                                         "response {} had neither payload nor error",
@@ -321,7 +322,7 @@ impl ControlConnection {
         Ok(())
     }
 
-    pub async fn invoke<P, R>(&self, method: &str, params: Option<P>) -> Result<R, Error>
+    pub async fn invoke<P, R>(&self, method: &str, params: Option<P>) -> Result<(R, u64), Error>
     where
         P: Serialize,
         R: DeserializeOwned,
@@ -349,9 +350,9 @@ impl ControlConnection {
             return Err(err);
         }
 
-        let payload = rx.await??;
+        let (payload, seq) = rx.await??;
 
-        Ok(serde_json::from_value(payload)?)
+        Ok((serde_json::from_value(payload)?, seq))
     }
 }
 

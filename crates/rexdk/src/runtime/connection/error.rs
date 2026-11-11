@@ -141,6 +141,19 @@ pub enum ControlError {
     /// The handshake message was malformed or invalid.
     #[error("handshake failed: {0}")]
     InvalidHandshake(String),
+
+    /// The server negotiated an API revision this client cannot use.
+    #[error(
+        "server negotiated API revision {negotiated}, outside the supported range {min}..={max}"
+    )]
+    Revision {
+        /// Revision the server selected for this connection.
+        negotiated: u32,
+        /// Oldest revision this client can use.
+        min: u32,
+        /// Newest revision this client can use.
+        max: u32,
+    },
 }
 
 /// A failure on a data connection.

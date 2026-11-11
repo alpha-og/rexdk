@@ -13,8 +13,9 @@ pub struct Response {
     /// The `id` of the request this response answers.
     pub id: String,
     /// Last event sequence queued before the request started.
-    #[allow(dead_code)] // retained for the event/response sequence barrier
-    pub seq: i64,
+    ///
+    /// Apply events with a higher [`seq`](Self::seq) on top of the result.
+    pub seq: u64,
     /// The method's result, absent when the request failed.
     pub payload: Option<Value>,
     /// Why the request failed, absent when it succeeded.

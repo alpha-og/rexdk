@@ -49,7 +49,7 @@ impl Generator {
 
         let binding = quote! {
             #[doc = #description]
-            pub async fn #binding_name(client: &Client, #args) -> Result<#output_ty, Error> {
+            pub async fn #binding_name(client: &Client, #args) -> Result<(#output_ty, u64), Error> {
                 client.invoke #rpc_arg_ty(#rpc_method, #rpc_arg_name).await
             }
         };
