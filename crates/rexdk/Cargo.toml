@@ -2,8 +2,8 @@
 name = "rexdk"
 version = "0.1.0"
 edition = "2024"
-description = "Typed Rust client for the Rex control API"
-repository = "https://github.com/alpha-og/rexdk-rs"
+description = "Typed Rust client library for the Rex control API"
+repository = "https://github.com/alpha-og/rexdk"
 readme = "README.md"
 keywords = ["rex", "sdk", "api", "bindings", "terminal"]
 categories = ["api-bindings", "development-tools"]

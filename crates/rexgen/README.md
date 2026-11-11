@@ -2,15 +2,15 @@
 
 A Rust binding generator for the Rex API.
 
-[Rex website](https://www.superlogical.com/rex) · [Rex documentation](https://www.superlogical.com/rex/docs) · [Repository](https://github.com/alpha-og/rexdk-rs)
+[Rex website](https://www.superlogical.com/rex) · [Rex documentation](https://www.superlogical.com/rex/docs) · [Repository](https://github.com/alpha-og/rexdk)
 
 `rexgen` converts a Rex API description into a tree of Rust modules and records
-the provenance of the schema that produced it. The library is pure: it accepts
-the API description as JSON text and returns the generated file paths and
+the provenance of the schema that produced it. The library performs no I/O: it
+takes the API description as JSON text and returns the generated file paths and
 contents. Reading the description and writing the output are the caller's
 responsibility.
 
-The `rexgen` binary adds schema fetching, lock-file verification, and
+The `rexgen` binary adds schema fetching, lock file verification, and
 staleness checks.
 
 ## Library
@@ -36,21 +36,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 `generate` returns the binding files only, rooted at the given directory. The
 CLI also prepends a header containing the API revision and schema hash to every
-file, and passes the lock-file provenance so it is embedded in
+file, and passes the lock file provenance so that it is embedded in
 `bindings/metadata.rs`.
+
+`Provenance` mirrors the lock file: schema version, API revision, Rex version,
+server commit, dirty tree flag, and schema SHA-256. The generated metadata
+module exposes the same values as constants for use at compile time.
 
 ## CLI
 
 The binary is enabled by the default `cli` feature.
 
 ```sh
-# Regenerate crates/rexdk/src/bindings/ from the checked-in spec.
+# Regenerate the checked-in bindings from the local schema.
 cargo run -p rexgen -- generate
 
 # Fail instead of writing when the checked-in bindings are stale.
 cargo run -p rexgen -- generate --check
 
-# Fetch the spec and provenance from a running Rex server.
+# Fetch the schema and provenance from a running Rex server.
 cargo run -p rexgen -- update-schema
 ```
 
@@ -65,6 +69,8 @@ cargo run -p rexgen -- update-schema
 
 Before generating, `generate` verifies the spec's SHA-256 against the lock file.
 If the spec changed without a corresponding lock update, generation fails.
+Output is written to a temporary directory and moved into place, so a failed
+generation does not leave a partial module tree.
 
 ### `update-schema`
 
@@ -91,7 +97,7 @@ If the spec changed without a corresponding lock update, generation fails.
 3. Generate Rust tokens for types and method functions.
 4. Format the output with `prettyplease`.
 
-Unsupported schema shapes are reported as `GenerateError` rather than emitted
+Unsupported schema shapes are reported as `rexgen::Error` rather than emitted
 as invalid Rust.
 
 ## Example
