@@ -490,6 +490,18 @@ pub(crate) async fn handshake(
         ));
     }
 
+    let negotiated = welcome.api_revision.unwrap_or(0);
+    if negotiated < config.api_min_revision || negotiated > config.api_revision {
+        return Err(ConnectionError::new(
+            context.clone(),
+            ConnectionErrorKind::Control(ControlError::Revision {
+                negotiated,
+                min: config.api_min_revision,
+                max: config.api_revision,
+            }),
+        ));
+    }
+
     Ok(welcome)
 }
 

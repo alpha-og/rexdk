@@ -39,6 +39,7 @@ pub struct Client {
     config: ClientConfig,
     reconnect_token: Option<String>,
     resumed: bool,
+    api_revision: Option<u32>,
     connection: Option<ControlConnection>,
     event_tx: mpsc::Sender<EventMessage>,
     event_rx: Option<mpsc::Receiver<EventMessage>>,
@@ -56,6 +57,7 @@ impl Client {
             config: config.unwrap_or_default(),
             reconnect_token: None,
             resumed: false,
+            api_revision: None,
             connection: None,
             event_tx,
             event_rx: Some(event_rx),
@@ -89,6 +91,7 @@ impl Client {
     }
 
     async fn connect_inner(&mut self) -> Result<(), Error> {
+        self.api_revision = None;
         let context = ConnectionContext::new(CONTROL_ENDPOINT, ConnectionPhase::Handshake);
         let mut control_stream = open_connection(
             &self.config.transport,
@@ -111,6 +114,7 @@ impl Client {
         )
         .await?;
         let max_message_bytes = welcome.limits.max_message_bytes;
+        self.api_revision = Some(welcome.api_revision.unwrap_or(0));
         let (writer, reader) = control_stream.split();
 
         let stream_context = context.with_phase(ConnectionPhase::Stream);
@@ -278,6 +282,15 @@ impl Client {
     /// keepalive times out, or after [`Client::disconnect`].
     pub fn is_connected(&self) -> bool {
         self.connection.is_some() && self.disconnect_rx.borrow().is_none()
+    }
+
+    /// Revision of the control API negotiated with the server.
+    ///
+    /// Returns the revision the server named in the welcome, so every message
+    /// on the connection uses that revision's shapes. `None` until a handshake
+    /// succeeds.
+    pub fn api_revision(&self) -> Option<u32> {
+        self.api_revision
     }
 
     /// Why the connection ended, if it has.

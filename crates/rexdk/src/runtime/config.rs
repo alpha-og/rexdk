@@ -25,7 +25,7 @@ impl Default for ClientConfig {
             version: String::new(),
             label: String::new(),
             api_revision: bindings::metadata::API_REVISION,
-            api_min_revision: 0,
+            api_min_revision: bindings::metadata::API_REVISION,
             transport: Transport::default(),
             keepalive: Some(KeepAlive::default()),
         }
