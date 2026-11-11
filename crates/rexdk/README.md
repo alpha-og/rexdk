@@ -66,9 +66,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 socket path and keepalive schedule are used. `connect` opens the WebSocket and
 performs the `hello`/`welcome` handshake.
 
+The handshake negotiates an API revision. `ClientConfig::api_min_revision` and
+`ClientConfig::api_revision` bound the revisions the client accepts and default
+to the revision the generated bindings target. If the server's welcome names a
+revision outside that range, `connect` fails with
+`ConnectionErrorKind::Control(ControlError::Revision { .. })`. After a
+successful handshake, `Client::api_revision` returns the negotiated value.
+
 ## Calling methods
 
-A generated function performs one call and returns the typed result:
+A generated function performs one call and returns the typed result together
+with the response's event sequence number:
 
 ```rust
 use rexdk::Client;
@@ -78,7 +86,7 @@ use rexdk::bindings::server::{StatusParams, status};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = Client::new(None);
     client.connect().await?;
-    let status = status(&client, StatusParams {}).await?;
+    let (status, _seq) = status(&client, StatusParams {}).await?;
 
     println!(
         "Rex server {} is running (pid {})",
@@ -89,6 +97,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+Every generated function returns `(Output, u64)`. The `u64` is the `seq` of the
+last event the server queued before it started the request. Use it to decide
+which events a result already includes; see “Combining results with events”
+below.
 
 Generated modules follow the API namespaces: `session.create` becomes
 `bindings::session::create`, and `server.status` becomes
@@ -107,8 +120,8 @@ Generated functions borrow the client (`client: &Client`), so a single
 connection handles any number of calls:
 
 ```rust
-let status = rexdk::bindings::server::status(&client, StatusParams {}).await?;
-let sessions = rexdk::bindings::session::list(&client, ListParams {}).await?;
+let (status, _) = rexdk::bindings::server::status(&client, StatusParams {}).await?;
+let (sessions, _) = rexdk::bindings::session::list(&client, ListParams {}).await?;
 ```
 
 `Client::invoke` is available for calls without a generated binding.
@@ -122,8 +135,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = Client::new(None);
     client.connect().await?;
 
-    let status: StatusOutput = client.invoke("server.status", None::<()>).await?;
-    let whoami: WhoamiOutput = client.invoke("server.whoami", None::<()>).await?;
+    let (status, _): (StatusOutput, u64) = client.invoke("server.status", None::<()>).await?;
+    let (whoami, _): (WhoamiOutput, u64) = client.invoke("server.whoami", None::<()>).await?;
 
     println!("pid: {}", status.pid);
     println!("sessions: {}", status.session_count);
@@ -187,6 +200,55 @@ consumed promptly; a slow consumer applies backpressure to the reader.
 
 `EventStream` also implements `futures_util::Stream`, so `StreamExt::next` and
 `tokio::select!` work directly.
+
+## Combining results with events
+
+Events and responses share one ordered connection, but their ordering is
+independent: an event can arrive before or after the response that already
+reflects it. Each response carries a `seq`, the sequence number of the last
+event the server had queued when it *started* the request (`0` if none). That
+number is the barrier.
+
+Every generated function returns `(Output, u64)`, and so does `Client::invoke`:
+
+```rust
+let (status, response_seq) = status(&client, StatusParams {}).await?;
+```
+
+To merge a result with concurrent events:
+
+1. Buffer events while the request is in flight instead of applying them.
+2. Apply the result.
+3. Discard buffered events with `seq <= response_seq`; the result already
+   includes them.
+4. Apply the remaining events in order.
+
+```rust
+let mut pending = Vec::new();
+let (view, barrier) = loop {
+    tokio::select! {
+        result = session::view(&client, view_params.clone()) => break result?,
+        event = events.recv() => pending.push(event.unwrap()),
+    }
+};
+
+apply(&mut state, view);
+for event in pending {
+    if event.seq > barrier {
+        apply(&mut state, event);
+    }
+}
+```
+
+Applying a result is not exclusive: the request runs concurrently, so an event
+with `seq > barrier` may also already be reflected in the result. Make `apply`
+idempotent — for sessions, compare revisions and ignore changes at or below the
+current one. If you never consume events, or always re-read state after a
+request, you can ignore `seq`.
+
+`seq` restarts at `1` on every control connection. After a reconnect, treat the
+new sequence as a separate generation rather than comparing it with values from
+the old connection.
 
 ## Data connections
 
@@ -325,7 +387,7 @@ use rexdk::{Client, Error};
 async fn connect_and_query() -> Result<(), Error> {
     let mut client = Client::new(None);
     client.connect().await?;
-    let _status: rexdk::bindings::server::StatusOutput =
+    let (_status, _): (rexdk::bindings::server::StatusOutput, u64) =
         client.invoke("server.status", None::<()>).await?;
     Ok(())
 }
