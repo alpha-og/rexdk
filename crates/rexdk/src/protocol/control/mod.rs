@@ -12,7 +12,7 @@ mod request;
 mod response;
 mod welcome;
 
-pub use hello::{ClientInfo, ClientKind, Hello, Platform};
+pub use hello::{ClientInfo, ClientKind, HELLO_MAX_BYTES, Hello, Platform};
 pub use message::ControlMessage;
 pub use request::Request;
 pub use response::{Response, ResponseError};

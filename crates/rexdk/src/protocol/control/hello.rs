@@ -1,5 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+/// Size limit for a serialized HELLO, in bytes.
+///
+/// Rex requires the whole HELLO to stay under this limit uncompressed, so that
+/// compression cannot leak the reconnect token.
+pub const HELLO_MAX_BYTES: usize = 512;
+
 /// What sort of program a client is.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]

@@ -5,6 +5,11 @@
 //! server answers with WELCOME or REJECT. After WELCOME, binary frames are raw
 //! stream bytes.
 
+/// Largest binary message a data connection carries, in bytes.
+///
+/// The protocol promises one to 65,536 stream bytes per message.
+pub const MAX_STREAM_MESSAGE_BYTES: usize = 65_536;
+
 mod error;
 mod hello;
 mod message;
