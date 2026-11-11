@@ -15,7 +15,7 @@ use crate::{DisconnectReason, Error};
 
 use super::connection::{Connection, ConnectionState};
 use super::handshake::handshake;
-use super::{CONTROL_ENDPOINT, CONTROL_SUBPROTOCOL, EVENT_BUFFER_CAPACITY};
+use super::{CONTROL_ENDPOINT, CONTROL_SUBPROTOCOL, EventChannel};
 
 /// A handle to the control connection's lifecycle.
 ///
@@ -31,8 +31,9 @@ pub struct ControlHandle {
 #[derive(Debug)]
 struct ControlHandleInner {
     connection: std::sync::Mutex<Option<Arc<Connection>>>,
-    event_tx: mpsc::Sender<crate::events::EventMessage>,
+    events: EventChannel,
     event_rx: std::sync::Mutex<Option<mpsc::Receiver<crate::events::EventMessage>>>,
+    lagged_rx: watch::Receiver<Option<u64>>,
     disconnect_tx: watch::Sender<Option<DisconnectReason>>,
     disconnect_rx: watch::Receiver<Option<DisconnectReason>>,
     session: std::sync::Mutex<SessionState>,
@@ -53,15 +54,22 @@ fn lock<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 }
 
 impl ControlHandle {
-    pub fn new() -> Self {
-        let (event_tx, event_rx) = mpsc::channel(EVENT_BUFFER_CAPACITY);
+    pub fn new(event_buffer_capacity: usize) -> Self {
+        let capacity = event_buffer_capacity.max(1);
+        let (event_tx, event_rx) = mpsc::channel(capacity);
+        let (lagged_tx, lagged_rx) = watch::channel(None);
         let (disconnect_tx, disconnect_rx) = watch::channel(None);
 
         Self {
             inner: Arc::new(ControlHandleInner {
                 connection: std::sync::Mutex::new(None),
-                event_tx,
+                events: EventChannel {
+                    events: event_tx,
+                    lagged: lagged_tx,
+                    capacity,
+                },
                 event_rx: std::sync::Mutex::new(Some(event_rx)),
+                lagged_rx,
                 disconnect_tx,
                 disconnect_rx,
                 session: std::sync::Mutex::new(SessionState::default()),
@@ -124,11 +132,12 @@ impl ControlHandle {
 
         // Reset before the reader starts, so an immediate close is not lost.
         self.inner.disconnect_tx.send_replace(None);
+        self.inner.events.reset_lag();
 
         let reader_task = Connection::spawn_reader(
             reader,
             Arc::clone(&state),
-            self.inner.event_tx.clone(),
+            self.inner.events.clone(),
             pongs_tx,
             self.inner.disconnect_tx.clone(),
             max_message_bytes,
@@ -299,8 +308,18 @@ impl ControlHandle {
     pub fn take_event_stream(&self) -> Result<crate::runtime::EventStream, Error> {
         lock(&self.inner.event_rx)
             .take()
-            .map(crate::runtime::EventStream::new)
+            .map(|rx| crate::runtime::EventStream::new(rx, self.inner.lagged_rx.clone()))
             .ok_or(Error::EventStreamTaken)
+    }
+
+    /// Sequence number of the first event the consumer failed to receive.
+    ///
+    /// `None` means the event stream has not lagged since the current
+    /// connection opened. A value is set when the configured backlog fills,
+    /// immediately before the connection ends with
+    /// [`DisconnectReason::EventBufferFull`].
+    pub fn lagged_event_seq(&self) -> Option<u64> {
+        self.inner.events.lagged()
     }
 
     pub async fn invoke<P, R>(&self, method: &str, params: Option<P>) -> Result<(R, u64), Error>
@@ -323,12 +342,6 @@ impl ControlHandle {
             .borrow()
             .clone()
             .map_or(Error::NotConnected, |reason| reason.to_error(context)))
-    }
-}
-
-impl Default for ControlHandle {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

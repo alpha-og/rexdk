@@ -13,7 +13,7 @@ The crate provides:
 
 - `Client` — connection management, request/response handling, events, data
   connections, and reconnection.
-- `ClientConfig` — client identity, transport, and keepalive configuration.
+- `ClientConfig` — client identity, transport, keepalive, and event backlog configuration.
 - `Transport` — Unix socket, TCP, Tailscale, or Windows named pipe endpoint.
 - `DataStream` / `DataStreamHandle` — block output and its connection handle.
 - `DisconnectReason` — why a connection ended.
@@ -195,8 +195,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 `take_event_stream` can be called once per `Client`. The stream is stable
 across reconnects and ends with `None` only when the `Client` is dropped, so
-use `Client::wait_disconnected` to observe a connection ending. Events must be
-consumed promptly; a slow consumer applies backpressure to the reader.
+use `Client::wait_disconnected` to observe a connection ending.
+
+The reader never waits for a slow consumer. Events are buffered up to
+`ClientConfig::event_buffer_capacity` (64 by default). If the backlog fills,
+the connection ends with `DisconnectReason::EventBufferFull` instead of
+dropping an event. `EventStream::lagged_event_seq` and
+`Client::lagged_event_seq` return the first event that did not fit; reconnect
+and read the state again before resuming.
 
 `EventStream` also implements `futures_util::Stream`, so `StreamExt::next` and
 `tokio::select!` work directly.

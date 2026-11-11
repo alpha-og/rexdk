@@ -15,6 +15,19 @@ pub struct ClientConfig {
     pub transport: Transport,
     /// Schedule for client-side pings. `None` disables them.
     pub keepalive: Option<KeepAlive>,
+    /// Maximum events buffered for a consumer that is not reading.
+    ///
+    /// The control reader never blocks on the event stream. If this backlog
+    /// fills, the connection ends with
+    /// [`DisconnectReason::EventBufferFull`](crate::DisconnectReason::EventBufferFull)
+    /// so the consumer can reconnect and resync. A value of `0` is treated as
+    /// `1`.
+    #[serde(default = "default_event_buffer_capacity")]
+    pub event_buffer_capacity: usize,
+}
+
+fn default_event_buffer_capacity() -> usize {
+    64
 }
 
 impl Default for ClientConfig {
@@ -28,6 +41,7 @@ impl Default for ClientConfig {
             api_min_revision: bindings::metadata::API_REVISION,
             transport: Transport::default(),
             keepalive: Some(KeepAlive::default()),
+            event_buffer_capacity: default_event_buffer_capacity(),
         }
     }
 }

@@ -31,9 +31,12 @@ pub struct Client {
 
 impl Client {
     pub fn new(config: Option<ClientConfig>) -> Self {
+        let config = config.unwrap_or_default();
+        let control = ControlHandle::new(config.event_buffer_capacity);
+
         Self {
-            config: config.unwrap_or_default(),
-            control: ControlHandle::new(),
+            config,
+            control,
             data_streams: vec![],
         }
     }
@@ -209,6 +212,16 @@ impl Client {
     /// ending without dropping the client.
     pub fn take_event_stream(&mut self) -> Result<EventStream, Error> {
         self.control.take_event_stream()
+    }
+
+    /// Sequence number of the first event the consumer failed to receive.
+    ///
+    /// `None` means the event backlog has not overflowed since the current
+    /// connection opened. A value is set immediately before the connection
+    /// ends with [`DisconnectReason::EventBufferFull`]; reconnect and read the
+    /// state again.
+    pub fn lagged_event_seq(&self) -> Option<u64> {
+        self.control.lagged_event_seq()
     }
 
     pub async fn invoke<P, R>(&self, method: &str, params: Option<P>) -> Result<(R, u64), Error>

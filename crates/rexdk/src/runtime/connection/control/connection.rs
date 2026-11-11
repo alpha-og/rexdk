@@ -13,7 +13,7 @@ use futures_util::{
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use tokio::{
-    sync::{mpsc, oneshot, oneshot::Sender, watch},
+    sync::{oneshot, oneshot::Sender, watch},
     task::{AbortHandle, JoinHandle},
 };
 use tokio_tungstenite::tungstenite;
@@ -25,7 +25,7 @@ use crate::runtime::connection::{
 use crate::runtime::transport::Stream;
 use crate::{DisconnectReason, Error, KeepAlive};
 
-use super::ControlWriter;
+use super::{ControlWriter, EventChannel};
 
 /// State tied to one control socket.
 pub(super) struct Connection {
@@ -80,14 +80,14 @@ impl Connection {
     pub(super) fn spawn_reader(
         mut reader: SplitStream<Stream>,
         state: Arc<tokio::sync::Mutex<ConnectionState>>,
-        event_tx: mpsc::Sender<crate::events::EventMessage>,
+        events: EventChannel,
         pongs: watch::Sender<u64>,
         disconnect_tx: watch::Sender<Option<DisconnectReason>>,
         max_message_bytes: usize,
     ) -> JoinHandle<()> {
         tokio::spawn(async move {
             let reason =
-                Self::read_loop(&mut reader, &state, &event_tx, &pongs, max_message_bytes).await;
+                Self::read_loop(&mut reader, &state, &events, &pongs, max_message_bytes).await;
             Self::teardown(&state, &disconnect_tx, reason, true).await;
         })
     }
@@ -208,7 +208,7 @@ impl Connection {
     async fn read_loop(
         reader: &mut SplitStream<Stream>,
         state: &tokio::sync::Mutex<ConnectionState>,
-        event_tx: &mpsc::Sender<crate::events::EventMessage>,
+        events: &EventChannel,
         pongs: &watch::Sender<u64>,
         max_message_bytes: usize,
     ) -> DisconnectReason {
@@ -246,9 +246,11 @@ impl Connection {
                             }
                         }
                         protocol::ControlMessage::Event(event) => {
-                            // If the consumer dropped the event stream, stop
-                            // forwarding events but keep serving responses.
-                            let _ = event_tx.send(event).await;
+                            // Never block the reader on a slow consumer:
+                            // responses and pongs keep flowing.
+                            if let Err(reason) = events.send(event) {
+                                return reason;
+                            }
                         }
                         protocol::ControlMessage::Hello(_)
                         | protocol::ControlMessage::Request(_)

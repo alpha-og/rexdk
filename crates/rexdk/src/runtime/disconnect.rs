@@ -22,6 +22,10 @@ use crate::{
 /// [`DisconnectReason::Abnormal`], the WebSocket status `1006`. Rex keeps such
 /// a client for 60 seconds, so [`crate::Client::reconnect`] can resume it
 /// within that window.
+///
+/// [`DisconnectReason::EventBufferFull`] is local: the client stopped reading
+/// events quickly enough to fill its configured backlog, so it ended the
+/// connection instead of dropping an event.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum DisconnectReason {
     /// The client closed the connection, either with
@@ -57,6 +61,16 @@ pub enum DisconnectReason {
         size: usize,
         /// Largest message the connection allows, in bytes.
         limit: usize,
+    },
+
+    /// The consumer fell behind and filled the configured event backlog.
+    ///
+    /// The client closes the connection instead of dropping events, so the
+    /// consumer must reconnect and read the state again.
+    #[error("event backlog exceeded the client capacity of {capacity} events")]
+    EventBufferFull {
+        /// Configured event backlog size, in events.
+        capacity: usize,
     },
 }
 
