@@ -74,6 +74,9 @@ pub async fn event(
     client.invoke("block.event", Some(event_params)).await
 }
 ///Call a method that a block provides and return its result.
-pub async fn method(client: &Client, method_params: MethodParams) -> Result<(), Error> {
+pub async fn method(
+    client: &Client,
+    method_params: MethodParams,
+) -> Result<serde_json::Value, Error> {
     client.invoke("block.method", Some(method_params)).await
 }

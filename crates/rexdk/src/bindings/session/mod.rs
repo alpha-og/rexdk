@@ -1649,7 +1649,10 @@ pub async fn focus_window(
     client.invoke("session.focus_window", Some(focus_window_params)).await
 }
 ///Describe the methods this session accepts and the methods its blocks provide.
-pub async fn help(client: &Client, help_params: HelpParams) -> Result<(), Error> {
+pub async fn help(
+    client: &Client,
+    help_params: HelpParams,
+) -> Result<serde_json::Value, Error> {
     client.invoke("session.help", Some(help_params)).await
 }
 ///List the sessions on the server.

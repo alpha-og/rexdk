@@ -44,7 +44,7 @@ impl Generator {
         let output_ty_name = format!("{}Output", method_name.to_upper_camel_case());
         let output_ty: TokenStream = match &method.output_schema {
             Some(schema) => Self::generate_type(&mut registry, schema, &output_ty_name)?,
-            None => quote! {()},
+            None => quote! { serde_json::Value },
         };
 
         let binding = quote! {

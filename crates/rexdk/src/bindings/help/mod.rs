@@ -4,6 +4,6 @@
 
 use crate::runtime::{Client, Error};
 ///Describe every method the server provides, including block methods.
-pub async fn all(client: &Client) -> Result<(), Error> {
+pub async fn all(client: &Client) -> Result<serde_json::Value, Error> {
     client.invoke::<(), _>("help.all", None).await
 }
