@@ -129,6 +129,7 @@ impl Client {
             self.event_tx.clone(),
             pongs_tx,
             self.disconnect_tx.clone(),
+            max_message_bytes,
         );
         let keepalive_task = self.config.keepalive.clone().map(|config| {
             ControlConnection::spawn_keepalive(

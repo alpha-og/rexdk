@@ -1,5 +1,5 @@
 use crate::protocol;
-use crate::protocol::control::{ClientInfo, Hello, Platform, Welcome};
+use crate::protocol::control::{ClientInfo, HELLO_MAX_BYTES, Hello, Platform, Welcome};
 use crate::runtime::config::ClientConfig;
 use crate::runtime::connection::{
     ConnectionContext, ConnectionError, ConnectionErrorKind, ControlError, HANDSHAKE_TIMEOUT,
@@ -90,9 +90,11 @@ impl ControlConnection {
         event_tx: mpsc::Sender<crate::events::EventMessage>,
         pongs: watch::Sender<u64>,
         disconnect_tx: watch::Sender<Option<DisconnectReason>>,
+        max_message_bytes: usize,
     ) -> JoinHandle<()> {
         tokio::spawn(async move {
-            let reason = Self::read_loop(&mut reader, &state, &event_tx, &pongs).await;
+            let reason =
+                Self::read_loop(&mut reader, &state, &event_tx, &pongs, max_message_bytes).await;
             Self::teardown(&state, &disconnect_tx, reason, true).await;
         })
     }
@@ -215,10 +217,18 @@ impl ControlConnection {
         state: &tokio::sync::Mutex<ConnectionState>,
         event_tx: &mpsc::Sender<crate::events::EventMessage>,
         pongs: &watch::Sender<u64>,
+        max_message_bytes: usize,
     ) -> DisconnectReason {
         loop {
             match reader.next().await {
                 Some(Ok(tungstenite::Message::Text(text))) => {
+                    if text.len() > max_message_bytes {
+                        return DisconnectReason::MessageTooLarge {
+                            size: text.len(),
+                            limit: max_message_bytes,
+                        };
+                    }
+
                     let Ok(message) =
                         serde_json::from_str::<protocol::ControlMessage>(text.as_str())
                     else {
@@ -388,6 +398,16 @@ pub(crate) async fn handshake(
             ConnectionErrorKind::Control(ControlError::InvalidHandshake(err.to_string())),
         )
     })?;
+
+    if json.len() >= HELLO_MAX_BYTES {
+        return Err(ConnectionError::new(
+            context.clone(),
+            ConnectionErrorKind::Control(ControlError::InvalidHandshake(format!(
+                "hello is {} bytes, must be under {HELLO_MAX_BYTES} bytes",
+                json.len()
+            ))),
+        ));
+    }
 
     let message = timeout(HANDSHAKE_TIMEOUT, async {
         stream

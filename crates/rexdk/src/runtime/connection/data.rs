@@ -40,7 +40,7 @@ use crate::{
     Error,
     protocol::{
         DataMessage,
-        data::{Hello, RECONNECT_TOKEN_LEN, Resume, TICKET_LEN, Welcome},
+        data::{Hello, MAX_STREAM_MESSAGE_BYTES, RECONNECT_TOKEN_LEN, Resume, TICKET_LEN, Welcome},
     },
     runtime::{
         data_stream::DataStream,
@@ -366,6 +366,21 @@ impl Worker {
                         // The protocol promises 1 to 65,536 bytes per message.
                         if bytes.is_empty() {
                             continue;
+                        }
+
+                        if bytes.len() > MAX_STREAM_MESSAGE_BYTES {
+                            let context =
+                                self.context.connection_context(ConnectionPhase::Stream);
+                            return StreamEnd::Fatal(
+                                ConnectionError::new(
+                                    context,
+                                    ConnectionErrorKind::Data(DataError::MessageTooLarge {
+                                        size: bytes.len(),
+                                        limit: MAX_STREAM_MESSAGE_BYTES,
+                                    }),
+                                )
+                                .into(),
+                            );
                         }
 
                         let len = bytes.len() as u64;

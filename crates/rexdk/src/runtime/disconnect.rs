@@ -49,6 +49,15 @@ pub enum DisconnectReason {
     /// Reading from the connection failed.
     #[error("read failed: {0}")]
     ReadError(String),
+
+    /// The server sent a message larger than the connection allows.
+    #[error("message is {size} bytes, above the connection limit of {limit} bytes")]
+    MessageTooLarge {
+        /// Size of the message, in bytes.
+        size: usize,
+        /// Largest message the connection allows, in bytes.
+        limit: usize,
+    },
 }
 
 impl DisconnectReason {

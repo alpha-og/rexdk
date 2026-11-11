@@ -187,6 +187,15 @@ pub enum DataError {
     #[error("the stream is no longer available for resumption")]
     ResumeWindowElapsed,
 
+    /// A stream message is larger than the data protocol allows.
+    #[error("data frame is {size} bytes, above the protocol limit of {limit} bytes")]
+    MessageTooLarge {
+        /// Size of the frame, in bytes.
+        size: usize,
+        /// Largest frame the protocol allows, in bytes.
+        limit: usize,
+    },
+
     /// `data.connect` returned a ticket without naming a subprotocol.
     #[error("data.connect did not specify a subprotocol for the data connection")]
     MissingSubprotocol,
