@@ -15,8 +15,7 @@ use tokio_tungstenite::tungstenite;
 
 use crate::runtime::transport::{self, Stream, Transport, TransportError};
 
-pub(crate) use control::handshake as control_handshake;
-pub use control::{CONTROL_ENDPOINT, CONTROL_SUBPROTOCOL, ConnectionState, ControlConnection};
+pub(crate) use control::ControlHandle;
 pub(crate) use data::DataConnectContext;
 pub use data::{DATA_ENDPOINT, DataStreamHandle};
 pub use error::{
