@@ -380,7 +380,7 @@ fn current_platform() -> Platform {
         "windows" => Platform::Windows,
         "freebsd" => Platform::FreeBSD,
         "emscripten" | "wasm32" => Platform::Web,
-        other => Platform::Other,
+        _ => Platform::Other,
     }
 }
 
