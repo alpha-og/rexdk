@@ -1160,6 +1160,71 @@
           "args_schema": {
             "additionalProperties": false,
             "properties": {
+              "batch": {
+                "description": "An ID the client chooses for a group of files whose paths are typed together. Left out, the file is uploaded on its own.",
+                "type": "string"
+              },
+              "count": {
+                "description": "How many files the batch has. Required with batch.",
+                "type": "integer"
+              },
+              "index": {
+                "description": "The file's position in its batch, from 0. Paths are typed in this order.",
+                "type": "integer"
+              },
+              "name": {
+                "description": "The file's name. Only its last path component is used, without control characters.",
+                "type": "string"
+              },
+              "ref": {
+                "description": "The data reference for the file's stream: upload: followed by a new UUID in lower-case canonical form, which the client chooses.",
+                "type": "string"
+              },
+              "size": {
+                "description": "The file's exact size in bytes.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "ref",
+              "name",
+              "size"
+            ],
+            "type": "object"
+          },
+          "description": "Reserve a file to upload to the terminal's machine, such as one the user dropped on the terminal, and get a ticket for the rex.data.bytes.v1 data stream that carries its bytes. Once every file of the batch has arrived, the terminal types their paths as if the user had pasted them.",
+          "invoke": {
+            "method": "com.superlogical.terminal.upload_begin"
+          },
+          "name": "upload_begin",
+          "output_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "expires_in_ms": {
+                "description": "How long the ticket stays valid after the server issues it, in milliseconds.",
+                "maximum": 4294967295,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "ticket": {
+                "description": "A single-use ticket to send in the HELLO message that opens the data connection. Only a data connection from the same user can use it.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "ticket",
+              "expires_in_ms"
+            ],
+            "type": "object"
+          },
+          "validation_notes": [
+            "Call it as `com.superlogical.terminal.upload_begin` with `session_id`, `block_id`, and this method's own arguments under `args`."
+          ]
+        },
+        {
+          "args_schema": {
+            "additionalProperties": false,
+            "properties": {
               "data": {
                 "description": "The text to type. It can hold escape sequences for keys that aren't text, such as \\u001b[A for the up arrow.",
                 "type": "string"
@@ -3873,6 +3938,49 @@
             "description": "A random ID for this run of the server. A new value means a new server process, even if pid is the same.",
             "type": "string"
           },
+          "listeners": {
+            "description": "Each endpoint the server accepts connections on, primary first. Servers older than API revision 12 leave it out. Doesn't include built-in Tailscale, which the tailscale member describes.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "addresses": {
+                  "description": "The addresses the listener is bound to, such as a socket path or 127.0.0.1:54321. They show the port that an endpoint like 127.0.0.1:0 got. Left out when the server can't tell.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": [
+                    "null",
+                    "array"
+                  ]
+                },
+                "admission": {
+                  "description": "Which callers the listener lets in: 'peer_credentials', 'anonymous', 'tailscale_owner', 'tailscale_identified', or 'login_server'. Left out when the server can't tell. Show a value you don't know as it is.",
+                  "type": "string"
+                },
+                "endpoint": {
+                  "description": "The endpoint the listener was configured with, such as unix:///run/rex.sock, 127.0.0.1:7297, or tailnet://:7297.",
+                  "type": "string"
+                },
+                "primary": {
+                  "description": "True for the server's primary endpoint, where commands such as rex server status and rex server stop look for the server. Left out for the other listeners.",
+                  "type": "boolean"
+                },
+                "transport": {
+                  "description": "How the listener identifies its callers: 'unix', 'named_pipe', 'tcp', or 'tailscale'. Show a value you don't know as it is.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "endpoint",
+                "transport"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
           "pid": {
             "description": "The server's process ID.",
             "type": "integer"
@@ -5882,6 +5990,49 @@
               "instance_id": {
                 "description": "A random ID for this run of the server. A new value means a new server process, even if pid is the same.",
                 "type": "string"
+              },
+              "listeners": {
+                "description": "Each endpoint the server accepts connections on, primary first. Servers older than API revision 12 leave it out. Doesn't include built-in Tailscale, which the tailscale member describes.",
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "addresses": {
+                      "description": "The addresses the listener is bound to, such as a socket path or 127.0.0.1:54321. They show the port that an endpoint like 127.0.0.1:0 got. Left out when the server can't tell.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": [
+                        "null",
+                        "array"
+                      ]
+                    },
+                    "admission": {
+                      "description": "Which callers the listener lets in: 'peer_credentials', 'anonymous', 'tailscale_owner', 'tailscale_identified', or 'login_server'. Left out when the server can't tell. Show a value you don't know as it is.",
+                      "type": "string"
+                    },
+                    "endpoint": {
+                      "description": "The endpoint the listener was configured with, such as unix:///run/rex.sock, 127.0.0.1:7297, or tailnet://:7297.",
+                      "type": "string"
+                    },
+                    "primary": {
+                      "description": "True for the server's primary endpoint, where commands such as rex server status and rex server stop look for the server. Left out for the other listeners.",
+                      "type": "boolean"
+                    },
+                    "transport": {
+                      "description": "How the listener identifies its callers: 'unix', 'named_pipe', 'tcp', or 'tailscale'. Show a value you don't know as it is.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "endpoint",
+                    "transport"
+                  ],
+                  "type": "object"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
               },
               "pid": {
                 "description": "The server's process ID.",
