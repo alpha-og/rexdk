@@ -39,9 +39,7 @@ pub struct ListOutputCreatorsApi {
 }
 ///The block events, by name. Each value is a JSON Schema for the event's fields.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ListOutputCreatorsApiEvents(
-    pub std::collections::HashMap<String, serde_json::Value>,
-);
+pub struct ListOutputCreatorsApiEvents(pub std::collections::HashMap<String, serde_json::Value>);
 ///The block methods, by short name.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ListOutputCreatorsApiMethods(
@@ -101,9 +99,6 @@ pub struct ListOutputCreatorsFlavors {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ListParams {}
 ///List the creators the server can make blocks with, and their flavors.
-pub async fn list(
-    client: &Client,
-    list_params: ListParams,
-) -> Result<ListOutput, Error> {
+pub async fn list(client: &Client, list_params: ListParams) -> Result<(ListOutput, u64), Error> {
     client.invoke("block_creator.list", Some(list_params)).await
 }

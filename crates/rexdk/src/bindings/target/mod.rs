@@ -194,13 +194,15 @@ pub struct ResolveParamsScope {
 pub async fn complete(
     client: &Client,
     complete_params: CompleteParams,
-) -> Result<CompleteOutput, Error> {
-    client.invoke("target.complete", Some(complete_params)).await
+) -> Result<(CompleteOutput, u64), Error> {
+    client
+        .invoke("target.complete", Some(complete_params))
+        .await
 }
 ///Look up sessions, windows, blocks, or clients by ID, label, or position. Each query gets its own result, which says whether it matched one thing, nothing, or several.
 pub async fn resolve(
     client: &Client,
     resolve_params: ResolveParams,
-) -> Result<ResolveOutput, Error> {
+) -> Result<(ResolveOutput, u64), Error> {
     client.invoke("target.resolve", Some(resolve_params)).await
 }

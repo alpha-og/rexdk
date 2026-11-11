@@ -1000,59 +1000,60 @@ pub struct SetScriptParamsScripts {
 pub async fn action(
     client: &Client,
     action_params: ActionParams,
-) -> Result<ActionOutput, Error> {
+) -> Result<(ActionOutput, u64), Error> {
     client.invoke("client.action", Some(action_params)).await
 }
 ///Get one connected client's details, including the actions it offers.
 pub async fn inspect(
     client: &Client,
     inspect_params: InspectParams,
-) -> Result<InspectOutput, Error> {
+) -> Result<(InspectOutput, u64), Error> {
     client.invoke("client.inspect", Some(inspect_params)).await
 }
 ///Send a key to a block, giving Lua key bindings the first chance at it.
-pub async fn key(client: &Client, key_params: KeyParams) -> Result<KeyOutput, Error> {
+pub async fn key(client: &Client, key_params: KeyParams) -> Result<(KeyOutput, u64), Error> {
     client.invoke("client.key", Some(key_params)).await
 }
 ///Get what each key does for this client. The result combines the client's own bindings with the configuration file and the client's Lua scripts.
 pub async fn keymap(
     client: &Client,
     keymap_params: KeymapParams,
-) -> Result<KeymapOutput, Error> {
+) -> Result<(KeymapOutput, u64), Error> {
     client.invoke("client.keymap", Some(keymap_params)).await
 }
 ///List the clients connected to the server, in the order they connected.
-pub async fn list(
-    client: &Client,
-    list_params: ListParams,
-) -> Result<ListOutput, Error> {
+pub async fn list(client: &Client, list_params: ListParams) -> Result<(ListOutput, u64), Error> {
     client.invoke("client.list", Some(list_params)).await
 }
 ///Ask another client to perform one of its actions and wait for its answer.
 pub async fn perform(
     client: &Client,
     perform_params: PerformParams,
-) -> Result<PerformOutput, Error> {
+) -> Result<(PerformOutput, u64), Error> {
     client.invoke("client.perform", Some(perform_params)).await
 }
 ///Answer a client_call_requested or client_perform_requested event.
 pub async fn reply(
     client: &Client,
     reply_params: ReplyParams,
-) -> Result<ReplyOutput, Error> {
+) -> Result<(ReplyOutput, u64), Error> {
     client.invoke("client.reply", Some(reply_params)).await
 }
 ///Set or remove this client's label.
 pub async fn set_label(
     client: &Client,
     set_label_params: SetLabelParams,
-) -> Result<SetLabelOutput, Error> {
-    client.invoke("client.set_label", Some(set_label_params)).await
+) -> Result<(SetLabelOutput, u64), Error> {
+    client
+        .invoke("client.set_label", Some(set_label_params))
+        .await
 }
 ///Load Lua scripts for this client, replacing any it loaded before.
 pub async fn set_script(
     client: &Client,
     set_script_params: SetScriptParams,
-) -> Result<SetScriptOutput, Error> {
-    client.invoke("client.set_script", Some(set_script_params)).await
+) -> Result<(SetScriptOutput, u64), Error> {
+    client
+        .invoke("client.set_script", Some(set_script_params))
+        .await
 }

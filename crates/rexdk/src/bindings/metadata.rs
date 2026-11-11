@@ -25,4 +25,5 @@ pub const API_REVISION: u32 = 10;
 pub const REX_VERSION: &'static str = "0.0.1793645657-gd018d2";
 pub const SERVER_COMMIT: &'static str = "d018d2de8cc31281265906a4648ec9cae8d2f4c5";
 pub const SERVER_DIRTY: bool = false;
-pub const SCHEMA_SHA256: &'static str = "c3ac62d8d918b6a8f8bbf573fdc365d4842b7bab21e0ddb9a9b88c5746bd2833";
+pub const SCHEMA_SHA256: &'static str =
+    "c3ac62d8d918b6a8f8bbf573fdc365d4842b7bab21e0ddb9a9b88c5746bd2833";

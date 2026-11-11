@@ -26,6 +26,6 @@ pub struct ConnectParams {
 pub async fn connect(
     client: &Client,
     connect_params: ConnectParams,
-) -> Result<ConnectOutput, Error> {
+) -> Result<(ConnectOutput, u64), Error> {
     client.invoke("data.connect", Some(connect_params)).await
 }

@@ -202,34 +202,33 @@ pub struct WhoamiParams {}
 pub async fn config_reload(
     client: &Client,
     config_reload_params: ConfigReloadParams,
-) -> Result<ConfigReloadOutput, Error> {
-    client.invoke("server.config_reload", Some(config_reload_params)).await
+) -> Result<(ConfigReloadOutput, u64), Error> {
+    client
+        .invoke("server.config_reload", Some(config_reload_params))
+        .await
 }
 ///Get the server's identity, session count, configuration, and Tailscale status.
 pub async fn status(
     client: &Client,
     status_params: StatusParams,
-) -> Result<StatusOutput, Error> {
+) -> Result<(StatusOutput, u64), Error> {
     client.invoke("server.status", Some(status_params)).await
 }
 ///Shut the server down, or with if_idle, only if nothing is using it.
-pub async fn stop(
-    client: &Client,
-    stop_params: StopParams,
-) -> Result<StopOutput, Error> {
+pub async fn stop(client: &Client, stop_params: StopParams) -> Result<(StopOutput, u64), Error> {
     client.invoke("server.stop", Some(stop_params)).await
 }
 ///Get the version of Rex that the server is running and how it was built.
 pub async fn version(
     client: &Client,
     version_params: VersionParams,
-) -> Result<VersionOutput, Error> {
+) -> Result<(VersionOutput, u64), Error> {
     client.invoke("server.version", Some(version_params)).await
 }
 ///Get how the server identified you, and the account the server runs as.
 pub async fn whoami(
     client: &Client,
     whoami_params: WhoamiParams,
-) -> Result<WhoamiOutput, Error> {
+) -> Result<(WhoamiOutput, u64), Error> {
     client.invoke("server.whoami", Some(whoami_params)).await
 }

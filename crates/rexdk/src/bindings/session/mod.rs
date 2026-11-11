@@ -263,9 +263,7 @@ pub struct BootstrapOutputAttachedSessionsViewWindowsLayersLayout {
     pub rect: Vec<f64>,
     ///How this node divides in two. Set only when block_id isn't.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub split: Option<
-        Option<BootstrapOutputAttachedSessionsViewWindowsLayersLayoutSplit>,
-    >,
+    pub split: Option<Option<BootstrapOutputAttachedSessionsViewWindowsLayersLayoutSplit>>,
     #[serde(flatten)]
     pub additional: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -404,9 +402,7 @@ pub struct BootstrapOutputSelectedSessionViewWindowsLayersLayout {
     pub rect: Vec<f64>,
     ///How this node divides in two. Set only when block_id isn't.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub split: Option<
-        Option<BootstrapOutputSelectedSessionViewWindowsLayersLayoutSplit>,
-    >,
+    pub split: Option<Option<BootstrapOutputSelectedSessionViewWindowsLayersLayoutSplit>>,
     #[serde(flatten)]
     pub additional: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -626,9 +622,7 @@ pub struct DescribeBlockOutputApi {
 }
 ///The block events, by name. Each value is a JSON Schema for the event's fields.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct DescribeBlockOutputApiEvents(
-    pub std::collections::HashMap<String, serde_json::Value>,
-);
+pub struct DescribeBlockOutputApiEvents(pub std::collections::HashMap<String, serde_json::Value>);
 ///The block methods, by short name.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DescribeBlockOutputApiMethods(
@@ -1139,9 +1133,7 @@ pub struct NewLayerParams {
 }
 ///The blocks to create in the floating layer and how to arrange them. Each node holds either block, with a flavor and optional options and label, or split, with direction, before, after, and an optional ratio.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct NewLayerParamsLayout(
-    pub std::collections::HashMap<String, serde_json::Value>,
-);
+pub struct NewLayerParamsLayout(pub std::collections::HashMap<String, serde_json::Value>);
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NewSplitOutput {
     ///The block or split whose space was split. If the request didn't name one, this is the focused block the server used.
@@ -1186,9 +1178,7 @@ pub enum NewSplitParamsDirection {
 }
 ///The blocks to create beside the anchor and how to arrange them. Each node holds either block, with a flavor and optional options and label, or split, with direction, before, after, and an optional ratio.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct NewSplitParamsLayout(
-    pub std::collections::HashMap<String, serde_json::Value>,
-);
+pub struct NewSplitParamsLayout(pub std::collections::HashMap<String, serde_json::Value>);
 ///Where the new blocks go: 'before' for the left or top part, or 'after' for the right or bottom part.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum NewSplitParamsSide {
@@ -1222,9 +1212,7 @@ pub struct NewWindowParams {
 }
 ///The blocks to create in the window and how to arrange them. Required. Each node holds either block, with a flavor and optional options and label, or split, with direction, before, after, and an optional ratio.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct NewWindowParamsLayout(
-    pub std::collections::HashMap<String, serde_json::Value>,
-);
+pub struct NewWindowParamsLayout(pub std::collections::HashMap<String, serde_json::Value>);
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OwnBlockOutput {
     ///Each claimed block and its owner after this call.
@@ -1517,295 +1505,358 @@ pub struct ZoomBlockParams {
 pub async fn attach(
     client: &Client,
     attach_params: AttachParams,
-) -> Result<AttachOutput, Error> {
+) -> Result<(AttachOutput, u64), Error> {
     client.invoke("session.attach", Some(attach_params)).await
 }
 ///Start receiving events from the whole server and get the list of sessions.
 pub async fn attach_all(
     client: &Client,
     attach_all_params: AttachAllParams,
-) -> Result<AttachAllOutput, Error> {
-    client.invoke("session.attach_all", Some(attach_all_params)).await
+) -> Result<(AttachAllOutput, u64), Error> {
+    client
+        .invoke("session.attach_all", Some(attach_all_params))
+        .await
 }
 ///Set up a new connection in one call: receive events, list sessions, and attach.
 pub async fn bootstrap(
     client: &Client,
     bootstrap_params: BootstrapParams,
-) -> Result<BootstrapOutput, Error> {
-    client.invoke("session.bootstrap", Some(bootstrap_params)).await
+) -> Result<(BootstrapOutput, u64), Error> {
+    client
+        .invoke("session.bootstrap", Some(bootstrap_params))
+        .await
 }
 ///Close a floating layer and every block in it.
 pub async fn close_layer(
     client: &Client,
     close_layer_params: CloseLayerParams,
-) -> Result<CloseLayerOutput, Error> {
-    client.invoke("session.close_layer", Some(close_layer_params)).await
+) -> Result<(CloseLayerOutput, u64), Error> {
+    client
+        .invoke("session.close_layer", Some(close_layer_params))
+        .await
 }
 ///Close a window and every block in it.
 pub async fn close_window(
     client: &Client,
     close_window_params: CloseWindowParams,
-) -> Result<CloseWindowOutput, Error> {
-    client.invoke("session.close_window", Some(close_window_params)).await
+) -> Result<(CloseWindowOutput, u64), Error> {
+    client
+        .invoke("session.close_window", Some(close_window_params))
+        .await
 }
 ///Create a session, optionally with its first windows already in it.
 pub async fn create(
     client: &Client,
     create_params: CreateParams,
-) -> Result<CreateOutput, Error> {
+) -> Result<(CreateOutput, u64), Error> {
     client.invoke("session.create", Some(create_params)).await
 }
 ///Get a block's details and the methods, events, and actions it provides.
 pub async fn describe_block(
     client: &Client,
     describe_block_params: DescribeBlockParams,
-) -> Result<DescribeBlockOutput, Error> {
-    client.invoke("session.describe_block", Some(describe_block_params)).await
+) -> Result<(DescribeBlockOutput, u64), Error> {
+    client
+        .invoke("session.describe_block", Some(describe_block_params))
+        .await
 }
 ///Destroy a session and close every block in it.
 pub async fn destroy(
     client: &Client,
     destroy_params: DestroyParams,
-) -> Result<DestroyOutput, Error> {
+) -> Result<(DestroyOutput, u64), Error> {
     client.invoke("session.destroy", Some(destroy_params)).await
 }
 ///Detach the connection from a session. The connection stays open and the session keeps running.
 pub async fn detach(
     client: &Client,
     detach_params: DetachParams,
-) -> Result<DetachOutput, Error> {
+) -> Result<(DetachOutput, u64), Error> {
     client.invoke("session.detach", Some(detach_params)).await
 }
 ///Take a block out of its window without closing it. The block keeps running.
 pub async fn detach_block(
     client: &Client,
     detach_block_params: DetachBlockParams,
-) -> Result<DetachBlockOutput, Error> {
-    client.invoke("session.detach_block", Some(detach_block_params)).await
+) -> Result<(DetachBlockOutput, u64), Error> {
+    client
+        .invoke("session.detach_block", Some(detach_block_params))
+        .await
 }
 ///Give up the calling client's claim on blocks. The result lists each block's owner.
 pub async fn disown_block(
     client: &Client,
     disown_block_params: DisownBlockParams,
-) -> Result<DisownBlockOutput, Error> {
-    client.invoke("session.disown_block", Some(disown_block_params)).await
+) -> Result<(DisownBlockOutput, u64), Error> {
+    client
+        .invoke("session.disown_block", Some(disown_block_params))
+        .await
 }
 ///Move a block out of its window's layout into a new floating layer.
 pub async fn float_block(
     client: &Client,
     float_block_params: FloatBlockParams,
-) -> Result<FloatBlockOutput, Error> {
-    client.invoke("session.float_block", Some(float_block_params)).await
+) -> Result<(FloatBlockOutput, u64), Error> {
+    client
+        .invoke("session.float_block", Some(float_block_params))
+        .await
 }
 ///Focus a block, and make its window the active window if it isn't.
 pub async fn focus_block(
     client: &Client,
     focus_block_params: FocusBlockParams,
-) -> Result<FocusBlockOutput, Error> {
-    client.invoke("session.focus_block", Some(focus_block_params)).await
+) -> Result<(FocusBlockOutput, u64), Error> {
+    client
+        .invoke("session.focus_block", Some(focus_block_params))
+        .await
 }
 ///Move focus to the nearest block to the left, right, above, or below.
 pub async fn focus_direction(
     client: &Client,
     focus_direction_params: FocusDirectionParams,
-) -> Result<FocusDirectionOutput, Error> {
-    client.invoke("session.focus_direction", Some(focus_direction_params)).await
+) -> Result<(FocusDirectionOutput, u64), Error> {
+    client
+        .invoke("session.focus_direction", Some(focus_direction_params))
+        .await
 }
 ///Move focus to the next block in the active window.
 pub async fn focus_next_pane(
     client: &Client,
     focus_next_pane_params: FocusNextPaneParams,
-) -> Result<FocusNextPaneOutput, Error> {
-    client.invoke("session.focus_next_pane", Some(focus_next_pane_params)).await
+) -> Result<(FocusNextPaneOutput, u64), Error> {
+    client
+        .invoke("session.focus_next_pane", Some(focus_next_pane_params))
+        .await
 }
 ///Make the next window the active window.
 pub async fn focus_next_window(
     client: &Client,
     focus_next_window_params: FocusNextWindowParams,
-) -> Result<FocusNextWindowOutput, Error> {
-    client.invoke("session.focus_next_window", Some(focus_next_window_params)).await
+) -> Result<(FocusNextWindowOutput, u64), Error> {
+    client
+        .invoke("session.focus_next_window", Some(focus_next_window_params))
+        .await
 }
 ///Move focus to the previous block in the active window.
 pub async fn focus_previous_pane(
     client: &Client,
     focus_previous_pane_params: FocusPreviousPaneParams,
-) -> Result<FocusPreviousPaneOutput, Error> {
-    client.invoke("session.focus_previous_pane", Some(focus_previous_pane_params)).await
+) -> Result<(FocusPreviousPaneOutput, u64), Error> {
+    client
+        .invoke(
+            "session.focus_previous_pane",
+            Some(focus_previous_pane_params),
+        )
+        .await
 }
 ///Make the previous window the active window.
 pub async fn focus_previous_window(
     client: &Client,
     focus_previous_window_params: FocusPreviousWindowParams,
-) -> Result<FocusPreviousWindowOutput, Error> {
+) -> Result<(FocusPreviousWindowOutput, u64), Error> {
     client
-        .invoke("session.focus_previous_window", Some(focus_previous_window_params))
+        .invoke(
+            "session.focus_previous_window",
+            Some(focus_previous_window_params),
+        )
         .await
 }
 ///Make a window the active window. Focus goes to the block it last had focused.
 pub async fn focus_window(
     client: &Client,
     focus_window_params: FocusWindowParams,
-) -> Result<FocusWindowOutput, Error> {
-    client.invoke("session.focus_window", Some(focus_window_params)).await
+) -> Result<(FocusWindowOutput, u64), Error> {
+    client
+        .invoke("session.focus_window", Some(focus_window_params))
+        .await
 }
 ///Describe the methods this session accepts and the methods its blocks provide.
 pub async fn help(
     client: &Client,
     help_params: HelpParams,
-) -> Result<serde_json::Value, Error> {
+) -> Result<(serde_json::Value, u64), Error> {
     client.invoke("session.help", Some(help_params)).await
 }
 ///List the sessions on the server.
-pub async fn list(
-    client: &Client,
-    list_params: ListParams,
-) -> Result<ListOutput, Error> {
+pub async fn list(client: &Client, list_params: ListParams) -> Result<(ListOutput, u64), Error> {
     client.invoke("session.list", Some(list_params)).await
 }
 ///List every block in the session, including detached blocks.
 pub async fn list_blocks(
     client: &Client,
     list_blocks_params: ListBlocksParams,
-) -> Result<ListBlocksOutput, Error> {
-    client.invoke("session.list_blocks", Some(list_blocks_params)).await
+) -> Result<(ListBlocksOutput, u64), Error> {
+    client
+        .invoke("session.list_blocks", Some(list_blocks_params))
+        .await
 }
 ///List the clients attached to the session.
 pub async fn list_clients(
     client: &Client,
     list_clients_params: ListClientsParams,
-) -> Result<ListClientsOutput, Error> {
-    client.invoke("session.list_clients", Some(list_clients_params)).await
+) -> Result<(ListClientsOutput, u64), Error> {
+    client
+        .invoke("session.list_clients", Some(list_clients_params))
+        .await
 }
 ///Move a floating layer to the back, or just below another floating layer.
 pub async fn lower_layer(
     client: &Client,
     lower_layer_params: LowerLayerParams,
-) -> Result<LowerLayerOutput, Error> {
-    client.invoke("session.lower_layer", Some(lower_layer_params)).await
+) -> Result<(LowerLayerOutput, u64), Error> {
+    client
+        .invoke("session.lower_layer", Some(lower_layer_params))
+        .await
 }
 ///Move a session to another place in the order that session.list returns.
-pub async fn r#move(
-    client: &Client,
-    move_params: MoveParams,
-) -> Result<MoveOutput, Error> {
+pub async fn r#move(client: &Client, move_params: MoveParams) -> Result<(MoveOutput, u64), Error> {
     client.invoke("session.move", Some(move_params)).await
 }
 ///Move a block, or place a detached one, in a new split beside another block.
 pub async fn move_block(
     client: &Client,
     move_block_params: MoveBlockParams,
-) -> Result<MoveBlockOutput, Error> {
-    client.invoke("session.move_block", Some(move_block_params)).await
+) -> Result<(MoveBlockOutput, u64), Error> {
+    client
+        .invoke("session.move_block", Some(move_block_params))
+        .await
 }
 ///Move a window to another place in the session's window order.
 pub async fn move_window(
     client: &Client,
     move_window_params: MoveWindowParams,
-) -> Result<MoveWindowOutput, Error> {
-    client.invoke("session.move_window", Some(move_window_params)).await
+) -> Result<(MoveWindowOutput, u64), Error> {
+    client
+        .invoke("session.move_window", Some(move_window_params))
+        .await
 }
 ///Create a block without placing it in a window. Place it later with session.move_block.
 pub async fn new_block(
     client: &Client,
     new_block_params: NewBlockParams,
-) -> Result<NewBlockOutput, Error> {
-    client.invoke("session.new_block", Some(new_block_params)).await
+) -> Result<(NewBlockOutput, u64), Error> {
+    client
+        .invoke("session.new_block", Some(new_block_params))
+        .await
 }
 ///Create blocks in a new floating layer at the front of a window.
 pub async fn new_layer(
     client: &Client,
     new_layer_params: NewLayerParams,
-) -> Result<NewLayerOutput, Error> {
-    client.invoke("session.new_layer", Some(new_layer_params)).await
+) -> Result<(NewLayerOutput, u64), Error> {
+    client
+        .invoke("session.new_layer", Some(new_layer_params))
+        .await
 }
 ///Create blocks in a new split beside an existing block or split.
 pub async fn new_split(
     client: &Client,
     new_split_params: NewSplitParams,
-) -> Result<NewSplitOutput, Error> {
-    client.invoke("session.new_split", Some(new_split_params)).await
+) -> Result<(NewSplitOutput, u64), Error> {
+    client
+        .invoke("session.new_split", Some(new_split_params))
+        .await
 }
 ///Create a window and the blocks in its layout. It becomes the active window by default.
 pub async fn new_window(
     client: &Client,
     new_window_params: NewWindowParams,
-) -> Result<NewWindowOutput, Error> {
-    client.invoke("session.new_window", Some(new_window_params)).await
+) -> Result<(NewWindowOutput, u64), Error> {
+    client
+        .invoke("session.new_window", Some(new_window_params))
+        .await
 }
 ///Claim blocks for the calling client. The result lists each block's owner.
 pub async fn own_block(
     client: &Client,
     own_block_params: OwnBlockParams,
-) -> Result<OwnBlockOutput, Error> {
-    client.invoke("session.own_block", Some(own_block_params)).await
+) -> Result<(OwnBlockOutput, u64), Error> {
+    client
+        .invoke("session.own_block", Some(own_block_params))
+        .await
 }
 ///Move a floating layer to the front, or just above another floating layer.
 pub async fn raise_layer(
     client: &Client,
     raise_layer_params: RaiseLayerParams,
-) -> Result<RaiseLayerOutput, Error> {
-    client.invoke("session.raise_layer", Some(raise_layer_params)).await
+) -> Result<(RaiseLayerOutput, u64), Error> {
+    client
+        .invoke("session.raise_layer", Some(raise_layer_params))
+        .await
 }
 ///Move or resize a floating layer.
 pub async fn resize_layer(
     client: &Client,
     resize_layer_params: ResizeLayerParams,
-) -> Result<ResizeLayerOutput, Error> {
-    client.invoke("session.resize_layer", Some(resize_layer_params)).await
+) -> Result<(ResizeLayerOutput, u64), Error> {
+    client
+        .invoke("session.resize_layer", Some(resize_layer_params))
+        .await
 }
 ///Move the border between two blocks to change their sizes.
 pub async fn resize_pane(
     client: &Client,
     resize_pane_params: ResizePaneParams,
-) -> Result<ResizePaneOutput, Error> {
-    client.invoke("session.resize_pane", Some(resize_pane_params)).await
+) -> Result<(ResizePaneOutput, u64), Error> {
+    client
+        .invoke("session.resize_pane", Some(resize_pane_params))
+        .await
 }
 ///Set a block's label.
 pub async fn set_block_label(
     client: &Client,
     set_block_label_params: SetBlockLabelParams,
-) -> Result<SetBlockLabelOutput, Error> {
-    client.invoke("session.set_block_label", Some(set_block_label_params)).await
+) -> Result<(SetBlockLabelOutput, u64), Error> {
+    client
+        .invoke("session.set_block_label", Some(set_block_label_params))
+        .await
 }
 ///Set the session's label.
 pub async fn set_label(
     client: &Client,
     set_label_params: SetLabelParams,
-) -> Result<SetLabelOutput, Error> {
-    client.invoke("session.set_label", Some(set_label_params)).await
+) -> Result<(SetLabelOutput, u64), Error> {
+    client
+        .invoke("session.set_label", Some(set_label_params))
+        .await
 }
 ///Minimize a floating layer or return it to normal, optionally raising and focusing it.
 pub async fn set_layer_state(
     client: &Client,
     set_layer_state_params: SetLayerStateParams,
-) -> Result<SetLayerStateOutput, Error> {
-    client.invoke("session.set_layer_state", Some(set_layer_state_params)).await
+) -> Result<(SetLayerStateOutput, u64), Error> {
+    client
+        .invoke("session.set_layer_state", Some(set_layer_state_params))
+        .await
 }
 ///Set a window's label.
 pub async fn set_window_label(
     client: &Client,
     set_window_label_params: SetWindowLabelParams,
-) -> Result<SetWindowLabelOutput, Error> {
-    client.invoke("session.set_window_label", Some(set_window_label_params)).await
+) -> Result<(SetWindowLabelOutput, u64), Error> {
+    client
+        .invoke("session.set_window_label", Some(set_window_label_params))
+        .await
 }
 ///Swap the places of two blocks.
 pub async fn swap_blocks(
     client: &Client,
     swap_blocks_params: SwapBlocksParams,
-) -> Result<SwapBlocksOutput, Error> {
-    client.invoke("session.swap_blocks", Some(swap_blocks_params)).await
+) -> Result<(SwapBlocksOutput, u64), Error> {
+    client
+        .invoke("session.swap_blocks", Some(swap_blocks_params))
+        .await
 }
 ///Get the session's windows, their layouts, and their blocks in one snapshot.
-pub async fn view(
-    client: &Client,
-    view_params: ViewParams,
-) -> Result<ViewOutput, Error> {
+pub async fn view(client: &Client, view_params: ViewParams) -> Result<(ViewOutput, u64), Error> {
     client.invoke("session.view", Some(view_params)).await
 }
 ///Zoom a block to fill its window, or undo the zoom.
 pub async fn zoom_block(
     client: &Client,
     zoom_block_params: ZoomBlockParams,
-) -> Result<ZoomBlockOutput, Error> {
-    client.invoke("session.zoom_block", Some(zoom_block_params)).await
+) -> Result<(ZoomBlockOutput, u64), Error> {
+    client
+        .invoke("session.zoom_block", Some(zoom_block_params))
+        .await
 }

@@ -52,13 +52,20 @@ pub struct PrivacyStatusParams {}
 pub async fn grant_file_access(
     client: &Client,
     grant_file_access_params: GrantFileAccessParams,
-) -> Result<GrantFileAccessOutput, Error> {
-    client.invoke("server.apple.grant_file_access", Some(grant_file_access_params)).await
+) -> Result<(GrantFileAccessOutput, u64), Error> {
+    client
+        .invoke(
+            "server.apple.grant_file_access",
+            Some(grant_file_access_params),
+        )
+        .await
 }
 ///Report the macOS privacy permissions the server and its programs have.
 pub async fn privacy_status(
     client: &Client,
     privacy_status_params: PrivacyStatusParams,
-) -> Result<PrivacyStatusOutput, Error> {
-    client.invoke("server.apple.privacy_status", Some(privacy_status_params)).await
+) -> Result<(PrivacyStatusOutput, u64), Error> {
+    client
+        .invoke("server.apple.privacy_status", Some(privacy_status_params))
+        .await
 }

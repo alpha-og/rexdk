@@ -295,34 +295,44 @@ pub struct RenameParams {
 pub async fn disable(
     client: &Client,
     disable_params: DisableParams,
-) -> Result<DisableOutput, Error> {
-    client.invoke("server.tailscale.disable", Some(disable_params)).await
+) -> Result<(DisableOutput, u64), Error> {
+    client
+        .invoke("server.tailscale.disable", Some(disable_params))
+        .await
 }
 ///Turn on built-in Tailscale so devices on your tailnet can reach the server.
 pub async fn enable(
     client: &Client,
     enable_params: EnableParams,
-) -> Result<EnableOutput, Error> {
-    client.invoke("server.tailscale.enable", Some(enable_params)).await
+) -> Result<(EnableOutput, u64), Error> {
+    client
+        .invoke("server.tailscale.enable", Some(enable_params))
+        .await
 }
 ///Ask Tailscale for a sign-in link for the server's Tailscale device.
 pub async fn login(
     client: &Client,
     login_params: LoginParams,
-) -> Result<LoginOutput, Error> {
-    client.invoke("server.tailscale.login", Some(login_params)).await
+) -> Result<(LoginOutput, u64), Error> {
+    client
+        .invoke("server.tailscale.login", Some(login_params))
+        .await
 }
 ///Sign the server out of Tailscale and turn off built-in Tailscale.
 pub async fn logout(
     client: &Client,
     logout_params: LogoutParams,
-) -> Result<LogoutOutput, Error> {
-    client.invoke("server.tailscale.logout", Some(logout_params)).await
+) -> Result<(LogoutOutput, u64), Error> {
+    client
+        .invoke("server.tailscale.logout", Some(logout_params))
+        .await
 }
 ///Change the server's Tailscale device name without signing in again.
 pub async fn rename(
     client: &Client,
     rename_params: RenameParams,
-) -> Result<RenameOutput, Error> {
-    client.invoke("server.tailscale.rename", Some(rename_params)).await
+) -> Result<(RenameOutput, u64), Error> {
+    client
+        .invoke("server.tailscale.rename", Some(rename_params))
+        .await
 }

@@ -2,13 +2,13 @@
 // API revision: 10
 // Schema SHA-256: c3ac62d8d918b6a8f8bbf573fdc365d4842b7bab21e0ddb9a9b88c5746bd2833
 
-pub mod metadata;
 pub mod block;
 pub mod block_creator;
 pub mod client;
 pub mod data;
 pub mod help;
 pub mod hosts;
+pub mod metadata;
 pub mod server;
 pub mod session;
 pub mod target;

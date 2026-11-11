@@ -63,20 +63,20 @@ pub struct MethodParams {
 pub async fn close(
     client: &Client,
     close_params: CloseParams,
-) -> Result<CloseOutput, Error> {
+) -> Result<(CloseOutput, u64), Error> {
     client.invoke("block.close", Some(close_params)).await
 }
 ///Send an input event, such as a key press or a paste, to a block.
 pub async fn event(
     client: &Client,
     event_params: EventParams,
-) -> Result<EventOutput, Error> {
+) -> Result<(EventOutput, u64), Error> {
     client.invoke("block.event", Some(event_params)).await
 }
 ///Call a method that a block provides and return its result.
 pub async fn method(
     client: &Client,
     method_params: MethodParams,
-) -> Result<serde_json::Value, Error> {
+) -> Result<(serde_json::Value, u64), Error> {
     client.invoke("block.method", Some(method_params)).await
 }

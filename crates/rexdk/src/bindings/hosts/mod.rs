@@ -136,20 +136,17 @@ pub struct RemoveParams {
     pub id: String,
 }
 ///List the server's hosts: the other Rex servers you connect to by label.
-pub async fn list(
-    client: &Client,
-    list_params: ListParams,
-) -> Result<ListOutput, Error> {
+pub async fn list(client: &Client, list_params: ListParams) -> Result<(ListOutput, u64), Error> {
     client.invoke("hosts.list", Some(list_params)).await
 }
 ///Add a host to the server's host list, or replace the host with the same ID.
-pub async fn put(client: &Client, put_params: PutParams) -> Result<PutOutput, Error> {
+pub async fn put(client: &Client, put_params: PutParams) -> Result<(PutOutput, u64), Error> {
     client.invoke("hosts.put", Some(put_params)).await
 }
 ///Remove a host from the server's host list.
 pub async fn remove(
     client: &Client,
     remove_params: RemoveParams,
-) -> Result<RemoveOutput, Error> {
+) -> Result<(RemoveOutput, u64), Error> {
     client.invoke("hosts.remove", Some(remove_params)).await
 }
