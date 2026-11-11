@@ -8,7 +8,7 @@ pub enum ClientKind {
     #[default]
     Cli,
     Agent,
-    Other(String),
+    Other,
 }
 
 /// What platform a client runs on.
