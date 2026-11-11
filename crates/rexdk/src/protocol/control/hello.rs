@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 /// What sort of program a client is.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ClientKind {
     App,
     #[default]
@@ -12,6 +13,7 @@ pub enum ClientKind {
 
 /// What platform a client runs on.
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Platform {
     MacOS,
     IOS,
@@ -19,7 +21,7 @@ pub enum Platform {
     Windows,
     FreeBSD,
     Web,
-    Other(String),
+    Other,
 }
 
 /// A client-to-server control HELLO.
