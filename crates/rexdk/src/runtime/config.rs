@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Transport, protocol::control::ClientKind};
+use crate::{Transport, bindings, protocol::control::ClientKind};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ClientConfig {
@@ -24,7 +24,7 @@ impl Default for ClientConfig {
             name: String::new(),
             version: String::new(),
             label: String::new(),
-            api_revision: 0,
+            api_revision: bindings::metadata::API_REVISION,
             api_min_revision: 0,
             transport: Transport::default(),
             keepalive: Some(KeepAlive::default()),
