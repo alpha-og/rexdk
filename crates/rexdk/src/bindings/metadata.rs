@@ -12,15 +12,15 @@ pub struct Metadata {
 }
 pub const METADATA: Metadata = Metadata {
     schema_version: 1,
-    api_revision: 12,
-    rex_version: "0.1.0-preview.14",
-    server_commit: "7e460d02f51573990bfcdc6c44a5606d11c7d47a",
+    api_revision: 13,
+    rex_version: "0.1.0-preview.18",
+    server_commit: "baf79e0da35c529014d3a0c730280c712ae3c203",
     server_dirty: false,
-    schema_sha256: "f2e9b43538d495b7b725142c9304d8dfd0b37f29434088f74eb3e04442d3d13b",
+    schema_sha256: "a3bb98a8fb1880c395473f3c8ac91c2b9f93e8a8ba855770333037f22478afd8",
 };
 pub const SCHEMA_VERSION: u32 = 1;
-pub const API_REVISION: u32 = 12;
-pub const REX_VERSION: &'static str = "0.1.0-preview.14";
-pub const SERVER_COMMIT: &'static str = "7e460d02f51573990bfcdc6c44a5606d11c7d47a";
+pub const API_REVISION: u32 = 13;
+pub const REX_VERSION: &'static str = "0.1.0-preview.18";
+pub const SERVER_COMMIT: &'static str = "baf79e0da35c529014d3a0c730280c712ae3c203";
 pub const SERVER_DIRTY: bool = false;
-pub const SCHEMA_SHA256: &'static str = "f2e9b43538d495b7b725142c9304d8dfd0b37f29434088f74eb3e04442d3d13b";
+pub const SCHEMA_SHA256: &'static str = "a3bb98a8fb1880c395473f3c8ac91c2b9f93e8a8ba855770333037f22478afd8";
