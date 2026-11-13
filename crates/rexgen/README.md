@@ -35,9 +35,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 `generate` returns the binding files only, rooted at the given directory. The
-CLI also prepends a header containing the API revision and schema hash to every
-file, and passes the lock file provenance so that it is embedded in
-`bindings/metadata.rs`.
+CLI prepends a generated-file marker to every file, and passes the lock file
+provenance so that it is embedded in `bindings/metadata.rs`. The API revision
+and schema hash live there rather than in every file's header, so a schema
+change only touches the modules whose generated code actually changed.
 
 `Provenance` mirrors the lock file: schema version, API revision, Rex version,
 server commit, dirty tree flag, and schema SHA-256. The generated metadata
@@ -69,8 +70,8 @@ cargo run -p rexgen -- update-schema
 
 Before generating, `generate` verifies the spec's SHA-256 against the lock file.
 If the spec changed without a corresponding lock update, generation fails.
-Output is written to a temporary directory and moved into place, so a failed
-generation does not leave a partial module tree.
+Generation completes before anything is written; only files whose contents
+changed are rewritten, and files that are no longer generated are removed.
 
 ### `update-schema`
 

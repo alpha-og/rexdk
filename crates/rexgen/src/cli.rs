@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::metadata::{LOCK_SCHEMA_VERSION, SchemaLock, ServerVersion};
+use crate::metadata::{GENERATED_HEADER, LOCK_SCHEMA_VERSION, SchemaLock, ServerVersion};
 
 #[derive(Debug, Parser)]
 #[command(name = "rexgen", about = "Generate Rust SDK bindings from the Rex API")]
@@ -79,7 +79,6 @@ fn generate(spec_path: PathBuf, lock_path: PathBuf, out_path: PathBuf, check: bo
 
     schema_lock.verify_integrity(&spec_bytes)?;
 
-    let header = schema_lock.generate_header();
     let provenance = rexgen::Provenance {
         schema_version: schema_lock.schema_version,
         api_revision: schema_lock.api_revision,
@@ -92,47 +91,101 @@ fn generate(spec_path: PathBuf, lock_path: PathBuf, out_path: PathBuf, check: bo
     if check {
         let files =
             rexgen::generate(spec, &out_path, &provenance).context("generating bindings")?;
-        check_output(&out_path, &header, files)
+        check_output(&out_path, files)
     } else {
-        write_output(&out_path, spec, &header, &provenance)
+        write_output(&out_path, spec, &provenance)
     }
 }
 
-fn write_output(
-    out_path: &Path,
-    spec: &str,
-    header: &str,
-    provenance: &rexgen::Provenance,
-) -> Result<()> {
-    let tmp_path = PathBuf::from(format!("{}.tmp", out_path.display()));
+fn write_output(out_path: &Path, spec: &str, provenance: &rexgen::Provenance) -> Result<()> {
+    // Generate everything up front. `rexgen::generate` is pure, so a failure
+    // here leaves the existing bindings untouched.
+    let files = rexgen::generate(spec, out_path, provenance).context("generating bindings")?;
 
-    remove_path(&tmp_path)?;
-    fs::create_dir_all(&tmp_path).with_context(|| format!("creating {}", tmp_path.display()))?;
-
-    let files = rexgen::generate(spec, &tmp_path, provenance).context("generating bindings")?;
+    let mut expected = BTreeSet::new();
 
     for file in &files {
+        expected.insert(file.path.clone());
+
+        let contents = format!("{GENERATED_HEADER}{}", file.contents);
+
+        match fs::read_to_string(&file.path) {
+            Ok(actual) if actual == contents => continue,
+            _ => {}
+        }
+
         if let Some(parent) = file.path.parent() {
             fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
         }
 
-        fs::write(&file.path, format!("{header}{}", file.contents))
-            .with_context(|| format!("writing {}", file.path.display()))?;
+        write_file(&file.path, &contents)?;
     }
 
-    remove_path(out_path)?;
-
-    if let Some(parent) = out_path.parent() {
-        fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;
+    for path in collect_files(out_path)? {
+        if !expected.contains(&path) {
+            remove_path(&path)?;
+        }
     }
 
-    fs::rename(&tmp_path, out_path)
-        .with_context(|| format!("moving {} to {}", tmp_path.display(), out_path.display()))?;
+    prune_empty_dirs(out_path)?;
 
     Ok(())
 }
 
-fn check_output(out_path: &Path, header: &str, files: Vec<rexgen::GeneratedFile>) -> Result<()> {
+fn write_file(path: &Path, contents: &str) -> Result<()> {
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .context("generated path has no file name")?;
+    let tmp_path = path.with_file_name(format!(".{file_name}.tmp"));
+
+    fs::write(&tmp_path, contents).with_context(|| format!("writing {}", tmp_path.display()))?;
+
+    fs::rename(&tmp_path, path)
+        .with_context(|| format!("moving {} to {}", tmp_path.display(), path.display()))?;
+
+    Ok(())
+}
+
+fn prune_empty_dirs(root: &Path) -> Result<()> {
+    if !root.is_dir() {
+        return Ok(());
+    }
+
+    let mut dirs = vec![root.to_path_buf()];
+    let mut index = 0;
+
+    while index < dirs.len() {
+        let current = dirs[index].clone();
+        index += 1;
+
+        for entry in
+            fs::read_dir(&current).with_context(|| format!("reading {}", current.display()))?
+        {
+            let path = entry?.path();
+
+            if path.is_dir() {
+                dirs.push(path);
+            }
+        }
+    }
+
+    // Children appear after their parents, so iterate in reverse to remove
+    // empty directories bottom-up. Keep the output root itself.
+    for dir in dirs.iter().skip(1).rev() {
+        if fs::read_dir(dir)
+            .with_context(|| format!("reading {}", dir.display()))?
+            .next()
+            .is_none()
+        {
+            fs::remove_dir(dir).with_context(|| format!("removing {}", dir.display()))?;
+        }
+    }
+
+    Ok(())
+}
+
+fn check_output(out_path: &Path, files: Vec<rexgen::GeneratedFile>) -> Result<()> {
     let mut stale = Vec::new();
     let expected = files
         .iter()
@@ -140,7 +193,7 @@ fn check_output(out_path: &Path, header: &str, files: Vec<rexgen::GeneratedFile>
         .collect::<BTreeSet<_>>();
 
     for file in files {
-        let expected_contents = format!("{header}{}", file.contents);
+        let expected_contents = format!("{GENERATED_HEADER}{}", file.contents);
 
         match fs::read_to_string(&file.path) {
             Ok(actual) if actual == expected_contents => {}
