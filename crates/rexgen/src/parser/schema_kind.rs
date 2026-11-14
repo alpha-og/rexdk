@@ -9,6 +9,18 @@ use crate::{
 impl TryFrom<&serde_json::Value> for SchemaKind {
     type Error = ParseError;
     fn try_from(value: &serde_json::Value) -> Result<Self, Self::Error> {
+        if let Some(variants) = value
+            .get("anyOf")
+            .or_else(|| value.get("oneOf"))
+            .and_then(serde_json::Value::as_array)
+        {
+            let variants = variants
+                .iter()
+                .map(Schema::try_from)
+                .collect::<Result<Vec<_>, ParseError>>()?;
+            return Ok(SchemaKind::Union { variants });
+        }
+
         let base_kind = match value["type"].as_str() {
             Some(ty_str) => get_schema_kind_from_str(ty_str, value)?,
             None => value["type"]

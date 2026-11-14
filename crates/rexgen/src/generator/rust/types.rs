@@ -21,7 +21,10 @@ impl Generator {
             SchemaKind::Boolean => quote! { bool },
             SchemaKind::Unknown => quote! { serde_json::Value },
             SchemaKind::Null => quote! {()},
-            _ => unreachable!(),
+            SchemaKind::Enum { .. }
+            | SchemaKind::Array { .. }
+            | SchemaKind::Object { .. }
+            | SchemaKind::Union { .. } => unreachable!(),
         };
 
         Ok(ty)
@@ -108,6 +111,9 @@ impl Generator {
                 registry.register(name, definition)?;
                 quote! { #ident}
             }
+            SchemaKind::Union { variants } => {
+                Self::generate_union_type(registry, schema.description.as_ref(), name, variants)?
+            }
             _ => Self::generate_primitive_type(schema)?,
         };
         if schema.nullable {
@@ -133,6 +139,43 @@ impl Generator {
                 Vec<#inner_type>
             },
         }
+    }
+
+    fn generate_union_type(
+        registry: &mut TypeRegistry,
+        description: Option<&String>,
+        name: &str,
+        variants: &[Schema],
+    ) -> Result<TokenStream, RustGenerateError> {
+        let ident = Self::generate_identifier(name, &format!("{name}: {variants:?}"))?;
+        let description = Self::generate_description(description);
+        let mut used = Vec::new();
+        let mut variant_definitions = Vec::new();
+
+        for (index, variant) in variants.iter().enumerate() {
+            let mut variant_name = variant.schema_kind.label().to_upper_camel_case();
+            if used.contains(&variant_name) {
+                variant_name = format!("{variant_name}{}", index + 1);
+            }
+            used.push(variant_name.clone());
+
+            let variant_ident =
+                Self::generate_identifier(&variant_name, &format!("{name} union variant"))?;
+            let variant_type =
+                Self::generate_type(registry, variant, &format!("{name}{variant_name}"))?;
+            variant_definitions.push(quote! { #variant_ident(#variant_type) });
+        }
+
+        let definition = quote! {
+            #description
+            #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+            #[serde(untagged)]
+            pub enum #ident {
+                #(#variant_definitions,)*
+            }
+        };
+        registry.register(name, definition)?;
+        Ok(quote! { #ident })
     }
 
     fn generate_enum_type(

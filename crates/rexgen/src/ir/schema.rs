@@ -27,7 +27,28 @@ pub enum SchemaKind {
         properties: Properties,
         additional_properties: AdditionalProperties,
     },
+    Union {
+        variants: Vec<Schema>,
+    },
     Unknown,
+}
+
+impl SchemaKind {
+    /// Stable label for this kind, used to name generated variants.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::String => "string",
+            Self::Integer => "integer",
+            Self::Number => "number",
+            Self::Boolean => "boolean",
+            Self::Null => "null",
+            Self::Enum { .. } => "enum",
+            Self::Array { .. } => "array",
+            Self::Object { .. } => "object",
+            Self::Union { .. } => "union",
+            Self::Unknown => "value",
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
