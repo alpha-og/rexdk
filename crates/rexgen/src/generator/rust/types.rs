@@ -201,7 +201,10 @@ impl Generator {
             &field.schema,
             &format!("{}{}", struct_name, field.name.to_upper_camel_case()),
         )?;
-        if !field.required {
+        // A missing field and an explicit null both deserialize to `None`, and
+        // the schema gives no field a distinct meaning for the two, so an
+        // optional nullable field stays a single `Option`.
+        if !field.required && !field.schema.nullable {
             attribute_type = quote! { Option<#attribute_type> };
         }
 
