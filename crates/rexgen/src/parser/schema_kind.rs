@@ -9,6 +9,16 @@ use crate::{
 impl TryFrom<&serde_json::Value> for SchemaKind {
     type Error = ParseError;
     fn try_from(value: &serde_json::Value) -> Result<Self, Self::Error> {
+        if let Some(reference) = value.get("$ref").and_then(serde_json::Value::as_str) {
+            let anchor = reference.strip_prefix('#').unwrap_or(reference);
+            if anchor.is_empty() || anchor.contains('/') {
+                return Err(ParseError::InvalidSchema);
+            }
+            return Ok(SchemaKind::Ref {
+                anchor: anchor.to_owned(),
+            });
+        }
+
         if let Some(variants) = value
             .get("anyOf")
             .or_else(|| value.get("oneOf"))
@@ -40,6 +50,7 @@ impl TryFrom<&serde_json::Value> for SchemaKind {
                     schema_kind: base_kind,
                     description: None,
                     nullable: false,
+                    anchor: None,
                 }),
                 values: enum_values.clone(),
             }),

@@ -69,7 +69,7 @@ pub struct AttachOutputViewWindowsLayers {
     ///The layer's ID.
     pub layer_id: Option<String>,
     ///How the layer divides its space between blocks, as a tree of splits. Null when the layer is empty.
-    pub layout: Option<AttachOutputViewWindowsLayersLayout>,
+    pub layout: Option<ViewLayoutNode>,
     ///How the layer is presented: 'minimized' means don't draw it, though its blocks keep running, and only a floating layer can be minimized. Left out for a normal layer. Draw a state you don't know as normal.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state: Option<String>,
@@ -93,44 +93,6 @@ pub struct AttachOutputViewWindowsLayersBlocks {
     ///The client that owns the block. Left out when the block has no owner.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
-}
-///How the layer divides its space between blocks, as a tree of splits. Null when the layer is empty.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct AttachOutputViewWindowsLayersLayout {
-    ///The block at this node. Set only when split isn't.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_id: Option<String>,
-    ///Where this node sits, as [x, y, w, h] fractions of the window's width and height.
-    pub rect: [f64; 4],
-    ///How this node divides in two. Set only when block_id isn't.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub split: Option<AttachOutputViewWindowsLayersLayoutSplit>,
-    #[serde(flatten)]
-    pub additional: std::collections::HashMap<String, serde_json::Value>,
-}
-///How this node divides in two. Set only when block_id isn't.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct AttachOutputViewWindowsLayersLayoutSplit {
-    ///The node on the right or bottom.
-    pub after: serde_json::Value,
-    ///The node on the left or top.
-    pub before: serde_json::Value,
-    ///How the space is divided: 'horizontal' puts before on the left and after on the right, and 'vertical' puts before above after. Draw a direction you don't know as 'horizontal'.
-    pub direction: AttachOutputViewWindowsLayersLayoutSplitDirection,
-    ///The fraction of the space that before gets, between 0 and 1.
-    pub ratio: f64,
-    ///The split's ID. It stays the same while the split exists, so you can match splits across views.
-    pub split_id: Option<String>,
-    #[serde(flatten)]
-    pub additional: std::collections::HashMap<String, serde_json::Value>,
-}
-///How the space is divided: 'horizontal' puts before on the left and after on the right, and 'vertical' puts before above after. Draw a direction you don't know as 'horizontal'.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum AttachOutputViewWindowsLayersLayoutSplitDirection {
-    #[serde(rename = "horizontal")]
-    Horizontal,
-    #[serde(rename = "vertical")]
-    Vertical,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AttachParams {
@@ -226,7 +188,7 @@ pub struct BootstrapOutputAttachedSessionsViewWindowsLayers {
     ///The layer's ID.
     pub layer_id: Option<String>,
     ///How the layer divides its space between blocks, as a tree of splits. Null when the layer is empty.
-    pub layout: Option<BootstrapOutputAttachedSessionsViewWindowsLayersLayout>,
+    pub layout: Option<ViewLayoutNode>,
     ///How the layer is presented: 'minimized' means don't draw it, though its blocks keep running, and only a floating layer can be minimized. Left out for a normal layer. Draw a state you don't know as normal.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state: Option<String>,
@@ -250,44 +212,6 @@ pub struct BootstrapOutputAttachedSessionsViewWindowsLayersBlocks {
     ///The client that owns the block. Left out when the block has no owner.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
-}
-///How the layer divides its space between blocks, as a tree of splits. Null when the layer is empty.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct BootstrapOutputAttachedSessionsViewWindowsLayersLayout {
-    ///The block at this node. Set only when split isn't.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_id: Option<String>,
-    ///Where this node sits, as [x, y, w, h] fractions of the window's width and height.
-    pub rect: [f64; 4],
-    ///How this node divides in two. Set only when block_id isn't.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub split: Option<BootstrapOutputAttachedSessionsViewWindowsLayersLayoutSplit>,
-    #[serde(flatten)]
-    pub additional: std::collections::HashMap<String, serde_json::Value>,
-}
-///How this node divides in two. Set only when block_id isn't.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct BootstrapOutputAttachedSessionsViewWindowsLayersLayoutSplit {
-    ///The node on the right or bottom.
-    pub after: serde_json::Value,
-    ///The node on the left or top.
-    pub before: serde_json::Value,
-    ///How the space is divided: 'horizontal' puts before on the left and after on the right, and 'vertical' puts before above after. Draw a direction you don't know as 'horizontal'.
-    pub direction: BootstrapOutputAttachedSessionsViewWindowsLayersLayoutSplitDirection,
-    ///The fraction of the space that before gets, between 0 and 1.
-    pub ratio: f64,
-    ///The split's ID. It stays the same while the split exists, so you can match splits across views.
-    pub split_id: Option<String>,
-    #[serde(flatten)]
-    pub additional: std::collections::HashMap<String, serde_json::Value>,
-}
-///How the space is divided: 'horizontal' puts before on the left and after on the right, and 'vertical' puts before above after. Draw a direction you don't know as 'horizontal'.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum BootstrapOutputAttachedSessionsViewWindowsLayersLayoutSplitDirection {
-    #[serde(rename = "horizontal")]
-    Horizontal,
-    #[serde(rename = "vertical")]
-    Vertical,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BootstrapOutputDataTickets {
@@ -365,7 +289,7 @@ pub struct BootstrapOutputSelectedSessionViewWindowsLayers {
     ///The layer's ID.
     pub layer_id: Option<String>,
     ///How the layer divides its space between blocks, as a tree of splits. Null when the layer is empty.
-    pub layout: Option<BootstrapOutputSelectedSessionViewWindowsLayersLayout>,
+    pub layout: Option<ViewLayoutNode>,
     ///How the layer is presented: 'minimized' means don't draw it, though its blocks keep running, and only a floating layer can be minimized. Left out for a normal layer. Draw a state you don't know as normal.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state: Option<String>,
@@ -389,44 +313,6 @@ pub struct BootstrapOutputSelectedSessionViewWindowsLayersBlocks {
     ///The client that owns the block. Left out when the block has no owner.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
-}
-///How the layer divides its space between blocks, as a tree of splits. Null when the layer is empty.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct BootstrapOutputSelectedSessionViewWindowsLayersLayout {
-    ///The block at this node. Set only when split isn't.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_id: Option<String>,
-    ///Where this node sits, as [x, y, w, h] fractions of the window's width and height.
-    pub rect: [f64; 4],
-    ///How this node divides in two. Set only when block_id isn't.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub split: Option<BootstrapOutputSelectedSessionViewWindowsLayersLayoutSplit>,
-    #[serde(flatten)]
-    pub additional: std::collections::HashMap<String, serde_json::Value>,
-}
-///How this node divides in two. Set only when block_id isn't.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct BootstrapOutputSelectedSessionViewWindowsLayersLayoutSplit {
-    ///The node on the right or bottom.
-    pub after: serde_json::Value,
-    ///The node on the left or top.
-    pub before: serde_json::Value,
-    ///How the space is divided: 'horizontal' puts before on the left and after on the right, and 'vertical' puts before above after. Draw a direction you don't know as 'horizontal'.
-    pub direction: BootstrapOutputSelectedSessionViewWindowsLayersLayoutSplitDirection,
-    ///The fraction of the space that before gets, between 0 and 1.
-    pub ratio: f64,
-    ///The split's ID. It stays the same while the split exists, so you can match splits across views.
-    pub split_id: Option<String>,
-    #[serde(flatten)]
-    pub additional: std::collections::HashMap<String, serde_json::Value>,
-}
-///How the space is divided: 'horizontal' puts before on the left and after on the right, and 'vertical' puts before above after. Draw a direction you don't know as 'horizontal'.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum BootstrapOutputSelectedSessionViewWindowsLayersLayoutSplitDirection {
-    #[serde(rename = "horizontal")]
-    Horizontal,
-    #[serde(rename = "vertical")]
-    Vertical,
 }
 ///The server's status, as server.status returns it.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -1455,6 +1341,44 @@ pub struct SwapBlocksParams {
     ///The session to act on.
     pub session_id: String,
 }
+///How the layer divides its space between blocks, as a tree of splits. Null when the layer is empty.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ViewLayoutNode {
+    ///The block at this node. Set only when split isn't.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub block_id: Option<String>,
+    ///Where this node sits, as [x, y, w, h] fractions of the window's width and height.
+    pub rect: [f64; 4],
+    ///How this node divides in two. Set only when block_id isn't.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub split: Option<ViewLayoutNodeSplit>,
+    #[serde(flatten)]
+    pub additional: std::collections::HashMap<String, serde_json::Value>,
+}
+///How this node divides in two. Set only when block_id isn't.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ViewLayoutNodeSplit {
+    ///The node on the right or bottom.
+    pub after: Box<ViewLayoutNode>,
+    ///The node on the left or top.
+    pub before: Box<ViewLayoutNode>,
+    ///How the space is divided: 'horizontal' puts before on the left and after on the right, and 'vertical' puts before above after. Draw a direction you don't know as 'horizontal'.
+    pub direction: ViewLayoutNodeSplitDirection,
+    ///The fraction of the space that before gets, between 0 and 1.
+    pub ratio: f64,
+    ///The split's ID. It stays the same while the split exists, so you can match splits across views.
+    pub split_id: Option<String>,
+    #[serde(flatten)]
+    pub additional: std::collections::HashMap<String, serde_json::Value>,
+}
+///How the space is divided: 'horizontal' puts before on the left and after on the right, and 'vertical' puts before above after. Draw a direction you don't know as 'horizontal'.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum ViewLayoutNodeSplitDirection {
+    #[serde(rename = "horizontal")]
+    Horizontal,
+    #[serde(rename = "vertical")]
+    Vertical,
+}
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ViewOutput {
     ///The window the session shows. Left out when the session has no windows.
@@ -1498,7 +1422,7 @@ pub struct ViewOutputWindowsLayers {
     ///The layer's ID.
     pub layer_id: Option<String>,
     ///How the layer divides its space between blocks, as a tree of splits. Null when the layer is empty.
-    pub layout: Option<ViewOutputWindowsLayersLayout>,
+    pub layout: Option<ViewLayoutNode>,
     ///How the layer is presented: 'minimized' means don't draw it, though its blocks keep running, and only a floating layer can be minimized. Left out for a normal layer. Draw a state you don't know as normal.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub state: Option<String>,
@@ -1522,44 +1446,6 @@ pub struct ViewOutputWindowsLayersBlocks {
     ///The client that owns the block. Left out when the block has no owner.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
-}
-///How the layer divides its space between blocks, as a tree of splits. Null when the layer is empty.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ViewOutputWindowsLayersLayout {
-    ///The block at this node. Set only when split isn't.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_id: Option<String>,
-    ///Where this node sits, as [x, y, w, h] fractions of the window's width and height.
-    pub rect: [f64; 4],
-    ///How this node divides in two. Set only when block_id isn't.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub split: Option<ViewOutputWindowsLayersLayoutSplit>,
-    #[serde(flatten)]
-    pub additional: std::collections::HashMap<String, serde_json::Value>,
-}
-///How this node divides in two. Set only when block_id isn't.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ViewOutputWindowsLayersLayoutSplit {
-    ///The node on the right or bottom.
-    pub after: serde_json::Value,
-    ///The node on the left or top.
-    pub before: serde_json::Value,
-    ///How the space is divided: 'horizontal' puts before on the left and after on the right, and 'vertical' puts before above after. Draw a direction you don't know as 'horizontal'.
-    pub direction: ViewOutputWindowsLayersLayoutSplitDirection,
-    ///The fraction of the space that before gets, between 0 and 1.
-    pub ratio: f64,
-    ///The split's ID. It stays the same while the split exists, so you can match splits across views.
-    pub split_id: Option<String>,
-    #[serde(flatten)]
-    pub additional: std::collections::HashMap<String, serde_json::Value>,
-}
-///How the space is divided: 'horizontal' puts before on the left and after on the right, and 'vertical' puts before above after. Draw a direction you don't know as 'horizontal'.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub enum ViewOutputWindowsLayersLayoutSplitDirection {
-    #[serde(rename = "horizontal")]
-    Horizontal,
-    #[serde(rename = "vertical")]
-    Vertical,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ViewParams {

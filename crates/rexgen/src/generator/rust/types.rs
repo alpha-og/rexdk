@@ -24,7 +24,9 @@ impl Generator {
             SchemaKind::Enum { .. }
             | SchemaKind::Array { .. }
             | SchemaKind::Object { .. }
-            | SchemaKind::Union { .. } => unreachable!(),
+            | SchemaKind::Union { .. }
+            | SchemaKind::Named { .. }
+            | SchemaKind::Ref { .. } => unreachable!(),
         };
 
         Ok(ty)
@@ -111,15 +113,36 @@ impl Generator {
                 registry.register(name, definition)?;
                 quote! { #ident}
             }
-            SchemaKind::Union { variants } => {
-                Self::generate_union_type(registry, schema.description.as_ref(), name, variants)?
+            SchemaKind::Union { variants } => Self::generate_union_type(
+                registry,
+                schema.description.as_ref(),
+                name,
+                variants,
+            )?,
+            SchemaKind::Named { anchor } => {
+                let ident = Self::generate_identifier(
+                    &anchor.to_upper_camel_case(),
+                    &format!("anchor {anchor}"),
+                )?;
+                quote! { #ident }
+            }
+            SchemaKind::Ref { anchor } => {
+                let ident = Self::generate_identifier(
+                    &anchor.to_upper_camel_case(),
+                    &format!("$ref to {anchor}"),
+                )?;
+                quote! { Box<#ident> }
             }
             _ => Self::generate_primitive_type(schema)?,
         };
+        Ok(Self::wrap_nullable(schema, ty))
+    }
+
+    fn wrap_nullable(schema: &Schema, ty: TokenStream) -> TokenStream {
         if schema.nullable {
-            Ok(quote! {Option<#ty>})
+            quote! { Option<#ty> }
         } else {
-            Ok(ty)
+            ty
         }
     }
 

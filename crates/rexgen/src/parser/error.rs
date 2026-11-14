@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::ir::IrError;
+
 #[derive(Debug, Error)]
 pub enum ParseError {
     #[error("Unknown schema kind")]
@@ -10,4 +12,6 @@ pub enum ParseError {
     InvalidMethodName(String),
     #[error("duplicate method `{0}`")]
     DuplicateMethod(String),
+    #[error(transparent)]
+    Ir(#[from] IrError),
 }

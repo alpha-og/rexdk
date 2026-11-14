@@ -16,6 +16,10 @@ impl TryFrom<&serde_json::Value> for Schema {
             .get("description")
             .and_then(serde_json::Value::as_str)
             .map(String::from);
+        let anchor = value
+            .get("$anchor")
+            .and_then(serde_json::Value::as_str)
+            .map(String::from);
         let schema_kind = match SchemaKind::try_from(value)? {
             SchemaKind::Union { mut variants } => {
                 nullable |= variants
@@ -36,6 +40,7 @@ impl TryFrom<&serde_json::Value> for Schema {
             description,
             schema_kind,
             nullable,
+            anchor,
         })
     }
 }

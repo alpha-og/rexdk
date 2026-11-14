@@ -26,6 +26,6 @@ impl TryFrom<&ApiDescription> for Ir {
             methods.push(Method::try_from(method)?);
         }
 
-        Ok(Self { endpoints, methods })
+        Ok(Ir::new(endpoints, methods)?)
     }
 }

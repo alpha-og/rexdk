@@ -34,8 +34,26 @@ impl Module {
         path: &ModulePath,
         generated: GeneratedBinding,
     ) -> Result<(), RustGenerateError> {
+        self.module_mut(path)?.insert_item(path, generated)
+    }
+
+    pub fn insert_types(
+        &mut self,
+        path: &ModulePath,
+        types: Vec<(String, TokenStream)>,
+    ) -> Result<(), RustGenerateError> {
+        let module = self.module_mut(path)?;
+
+        for (name, definition) in types {
+            module.types.register(&name, definition)?;
+        }
+
+        Ok(())
+    }
+
+    fn module_mut(&mut self, path: &ModulePath) -> Result<&mut Module, RustGenerateError> {
         let Some((segment, rest)) = path.0.split_first() else {
-            return self.insert_item(path, generated);
+            return Ok(self);
         };
 
         let module = match self.children.entry(segment.canonical.clone()) {
@@ -62,7 +80,7 @@ impl Module {
             }
         };
 
-        module.insert(&ModulePath(rest.to_vec()), generated)
+        module.module_mut(&ModulePath(rest.to_vec()))
     }
 
     fn insert_item(

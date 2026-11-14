@@ -5,6 +5,7 @@ pub struct Schema {
     pub description: Option<String>,
     pub schema_kind: SchemaKind,
     pub nullable: bool,
+    pub anchor: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -30,6 +31,12 @@ pub enum SchemaKind {
     Union {
         variants: Vec<Schema>,
     },
+    Named {
+        anchor: String,
+    },
+    Ref {
+        anchor: String,
+    },
     Unknown,
 }
 
@@ -46,6 +53,8 @@ impl SchemaKind {
             Self::Array { .. } => "array",
             Self::Object { .. } => "object",
             Self::Union { .. } => "union",
+            Self::Named { .. } => "named",
+            Self::Ref { .. } => "ref",
             Self::Unknown => "value",
         }
     }

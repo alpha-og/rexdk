@@ -10,12 +10,13 @@ pub mod types;
 use std::path::Path;
 
 use crate::{
-    generator::rust::{module::Module, namespace::ModulePath},
+    generator::rust::{module::Module, namespace::ModulePath, registry::TypeRegistry},
     ir::Ir,
     provenance::Provenance,
 };
 pub use error::RustGenerateError;
 pub use generated_file::GeneratedFile;
+use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
@@ -51,6 +52,14 @@ impl Generator {
         base: &Path,
         provenance: &Provenance,
     ) -> Result<Vec<GeneratedFile>, RustGenerateError> {
+        for definition in self.ir.definitions.clone() {
+            let path = ModulePath::try_from_segments(&definition.namespace)?;
+            let name = definition.anchor.to_upper_camel_case();
+            let mut registry = TypeRegistry::default();
+            Generator::generate_type(&mut registry, &definition.schema, &name)?;
+            self.root.insert_types(&path, registry.flatten())?;
+        }
+
         for method in self.ir.methods.clone() {
             let path = ModulePath::try_from_segments(&method.namespace)?;
             let binding = self.generate_binding(&method)?;
