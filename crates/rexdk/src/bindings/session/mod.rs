@@ -30,7 +30,7 @@ pub struct AttachOutput {
 pub struct AttachOutputView {
     ///The window the session shows. Left out when the session has no windows.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_window_id: Option<Option<String>>,
+    pub active_window_id: Option<String>,
     ///The session's label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -40,13 +40,13 @@ pub struct AttachOutputView {
     pub session_id: Option<String>,
     ///The session's windows, in order. Rex.app shows them as tabs in this order.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub windows: Option<Option<Vec<AttachOutputViewWindows>>>,
+    pub windows: Option<Vec<AttachOutputViewWindows>>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AttachOutputViewWindows {
     ///The window's focused block, which receives typing while the window is active. Left out if the window has none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub focused_block_id: Option<Option<String>>,
+    pub focused_block_id: Option<String>,
     ///The window's label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -56,14 +56,14 @@ pub struct AttachOutputViewWindows {
     pub window_id: Option<String>,
     ///The block zoomed to fill the window, if any. Layouts keep their normal sizes, so draw this block over the whole window.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub zoomed_block_id: Option<Option<String>>,
+    pub zoomed_block_id: Option<String>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AttachOutputViewWindowsLayers {
     ///The blocks in the layer, in layout order. The layout field says where each one sits.
     pub blocks: Option<Vec<AttachOutputViewWindowsLayersBlocks>>,
     ///Where the layer sits, as [x, y, w, h] fractions of the window's width and height.
-    pub bounds: Vec<f64>,
+    pub bounds: [f64; 4],
     ///How the layer is placed: 'tiled' for the layer that fills the window, or 'floating' for a floating layer. Draw a kind you don't know as 'floating'.
     pub kind: String,
     ///The layer's ID.
@@ -92,19 +92,19 @@ pub struct AttachOutputViewWindowsLayersBlocks {
     pub label: Option<String>,
     ///The client that owns the block. Left out when the block has no owner.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner: Option<Option<String>>,
+    pub owner: Option<String>,
 }
 ///How the layer divides its space between blocks, as a tree of splits. Null when the layer is empty.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AttachOutputViewWindowsLayersLayout {
     ///The block at this node. Set only when split isn't.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_id: Option<Option<String>>,
+    pub block_id: Option<String>,
     ///Where this node sits, as [x, y, w, h] fractions of the window's width and height.
-    pub rect: Vec<f64>,
+    pub rect: [f64; 4],
     ///How this node divides in two. Set only when block_id isn't.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub split: Option<Option<AttachOutputViewWindowsLayersLayoutSplit>>,
+    pub split: Option<AttachOutputViewWindowsLayersLayoutSplit>,
     #[serde(flatten)]
     pub additional: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -143,12 +143,12 @@ pub struct BootstrapOutput {
     pub attach_all: BootstrapOutputAttachAll,
     ///The sessions attached from attach_session_ids, in the order requested. Sessions that don't exist are left out.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attached_sessions: Option<Option<Vec<BootstrapOutputAttachedSessions>>>,
+    pub attached_sessions: Option<Vec<BootstrapOutputAttachedSessions>>,
     ///This connection's client ID, the same one session.attach returns. Present even when no session is attached.
     pub client_id: String,
     ///A data ticket for each visible block in the returned views that matches an entry of the request's data_tickets. Call data.connect for a block that has none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub data_tickets: Option<Option<Vec<BootstrapOutputDataTickets>>>,
+    pub data_tickets: Option<Vec<BootstrapOutputDataTickets>>,
     ///The session the server chose and attached. Null if you sent attach_session_ids or there are no sessions.
     pub selected_session: Option<BootstrapOutputSelectedSession>,
     ///The server's status, as server.status returns it.
@@ -187,7 +187,7 @@ pub struct BootstrapOutputAttachedSessionsSession {
 pub struct BootstrapOutputAttachedSessionsView {
     ///The window the session shows. Left out when the session has no windows.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_window_id: Option<Option<String>>,
+    pub active_window_id: Option<String>,
     ///The session's label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -197,13 +197,13 @@ pub struct BootstrapOutputAttachedSessionsView {
     pub session_id: Option<String>,
     ///The session's windows, in order. Rex.app shows them as tabs in this order.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub windows: Option<Option<Vec<BootstrapOutputAttachedSessionsViewWindows>>>,
+    pub windows: Option<Vec<BootstrapOutputAttachedSessionsViewWindows>>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BootstrapOutputAttachedSessionsViewWindows {
     ///The window's focused block, which receives typing while the window is active. Left out if the window has none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub focused_block_id: Option<Option<String>>,
+    pub focused_block_id: Option<String>,
     ///The window's label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -213,14 +213,14 @@ pub struct BootstrapOutputAttachedSessionsViewWindows {
     pub window_id: Option<String>,
     ///The block zoomed to fill the window, if any. Layouts keep their normal sizes, so draw this block over the whole window.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub zoomed_block_id: Option<Option<String>>,
+    pub zoomed_block_id: Option<String>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BootstrapOutputAttachedSessionsViewWindowsLayers {
     ///The blocks in the layer, in layout order. The layout field says where each one sits.
     pub blocks: Option<Vec<BootstrapOutputAttachedSessionsViewWindowsLayersBlocks>>,
     ///Where the layer sits, as [x, y, w, h] fractions of the window's width and height.
-    pub bounds: Vec<f64>,
+    pub bounds: [f64; 4],
     ///How the layer is placed: 'tiled' for the layer that fills the window, or 'floating' for a floating layer. Draw a kind you don't know as 'floating'.
     pub kind: String,
     ///The layer's ID.
@@ -249,21 +249,19 @@ pub struct BootstrapOutputAttachedSessionsViewWindowsLayersBlocks {
     pub label: Option<String>,
     ///The client that owns the block. Left out when the block has no owner.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner: Option<Option<String>>,
+    pub owner: Option<String>,
 }
 ///How the layer divides its space between blocks, as a tree of splits. Null when the layer is empty.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BootstrapOutputAttachedSessionsViewWindowsLayersLayout {
     ///The block at this node. Set only when split isn't.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_id: Option<Option<String>>,
+    pub block_id: Option<String>,
     ///Where this node sits, as [x, y, w, h] fractions of the window's width and height.
-    pub rect: Vec<f64>,
+    pub rect: [f64; 4],
     ///How this node divides in two. Set only when block_id isn't.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub split: Option<
-        Option<BootstrapOutputAttachedSessionsViewWindowsLayersLayoutSplit>,
-    >,
+    pub split: Option<BootstrapOutputAttachedSessionsViewWindowsLayersLayoutSplit>,
     #[serde(flatten)]
     pub additional: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -328,7 +326,7 @@ pub struct BootstrapOutputSelectedSessionSession {
 pub struct BootstrapOutputSelectedSessionView {
     ///The window the session shows. Left out when the session has no windows.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_window_id: Option<Option<String>>,
+    pub active_window_id: Option<String>,
     ///The session's label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -338,13 +336,13 @@ pub struct BootstrapOutputSelectedSessionView {
     pub session_id: Option<String>,
     ///The session's windows, in order. Rex.app shows them as tabs in this order.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub windows: Option<Option<Vec<BootstrapOutputSelectedSessionViewWindows>>>,
+    pub windows: Option<Vec<BootstrapOutputSelectedSessionViewWindows>>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BootstrapOutputSelectedSessionViewWindows {
     ///The window's focused block, which receives typing while the window is active. Left out if the window has none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub focused_block_id: Option<Option<String>>,
+    pub focused_block_id: Option<String>,
     ///The window's label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -354,14 +352,14 @@ pub struct BootstrapOutputSelectedSessionViewWindows {
     pub window_id: Option<String>,
     ///The block zoomed to fill the window, if any. Layouts keep their normal sizes, so draw this block over the whole window.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub zoomed_block_id: Option<Option<String>>,
+    pub zoomed_block_id: Option<String>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BootstrapOutputSelectedSessionViewWindowsLayers {
     ///The blocks in the layer, in layout order. The layout field says where each one sits.
     pub blocks: Option<Vec<BootstrapOutputSelectedSessionViewWindowsLayersBlocks>>,
     ///Where the layer sits, as [x, y, w, h] fractions of the window's width and height.
-    pub bounds: Vec<f64>,
+    pub bounds: [f64; 4],
     ///How the layer is placed: 'tiled' for the layer that fills the window, or 'floating' for a floating layer. Draw a kind you don't know as 'floating'.
     pub kind: String,
     ///The layer's ID.
@@ -390,21 +388,19 @@ pub struct BootstrapOutputSelectedSessionViewWindowsLayersBlocks {
     pub label: Option<String>,
     ///The client that owns the block. Left out when the block has no owner.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner: Option<Option<String>>,
+    pub owner: Option<String>,
 }
 ///How the layer divides its space between blocks, as a tree of splits. Null when the layer is empty.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BootstrapOutputSelectedSessionViewWindowsLayersLayout {
     ///The block at this node. Set only when split isn't.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_id: Option<Option<String>>,
+    pub block_id: Option<String>,
     ///Where this node sits, as [x, y, w, h] fractions of the window's width and height.
-    pub rect: Vec<f64>,
+    pub rect: [f64; 4],
     ///How this node divides in two. Set only when block_id isn't.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub split: Option<
-        Option<BootstrapOutputSelectedSessionViewWindowsLayersLayoutSplit>,
-    >,
+    pub split: Option<BootstrapOutputSelectedSessionViewWindowsLayersLayoutSplit>,
     #[serde(flatten)]
     pub additional: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -452,7 +448,7 @@ pub struct BootstrapOutputServerStatus {
     pub instance_id: String,
     ///Each endpoint the server accepts connections on, primary first. Servers older than API revision 12 leave it out. Doesn't include built-in Tailscale, which the tailscale member describes.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub listeners: Option<Option<Vec<BootstrapOutputServerStatusListeners>>>,
+    pub listeners: Option<Vec<BootstrapOutputServerStatusListeners>>,
     ///The server's process ID.
     pub pid: i64,
     ///How many sessions the server has.
@@ -475,7 +471,7 @@ pub struct BootstrapOutputServerStatusConfig {
 pub struct BootstrapOutputServerStatusListeners {
     ///The addresses the listener is bound to, such as a socket path or 127.0.0.1:54321. They show the port that an endpoint like 127.0.0.1:0 got. Left out when the server can't tell.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub addresses: Option<Option<Vec<String>>>,
+    pub addresses: Option<Vec<String>>,
     ///Which callers the listener lets in: 'peer_credentials', 'anonymous', 'tailscale_owner', 'tailscale_identified', or 'login_server'. Left out when the server can't tell. Show a value you don't know as it is.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub admission: Option<String>,
@@ -514,7 +510,7 @@ pub struct BootstrapOutputServerStatusTailscale {
     pub state: String,
     ///The Tailscale tags the device has, such as tag:rex. A tagged device has no owner. Left out when it has none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Option<Vec<String>>>,
+    pub tags: Option<Vec<String>>,
     ///The tailnet's display name, or its domain if it has none. Left out until known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tailnet_name: Option<String>,
@@ -538,10 +534,10 @@ pub struct BootstrapOutputServerStatusTailscaleHttps {
 pub struct BootstrapParams {
     ///The sessions to attach to, in order. Unknown and repeated IDs are skipped, and an empty list attaches none. Leave it out to let the server pick one.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attach_session_ids: Option<Option<Vec<String>>>,
+    pub attach_session_ids: Option<Vec<String>>,
     ///The kinds of block to issue data tickets for. The response has a ticket for each visible block in an attached session that matches one. At most 8 entries.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub data_tickets: Option<Option<Vec<BootstrapParamsDataTickets>>>,
+    pub data_tickets: Option<Vec<BootstrapParamsDataTickets>>,
     ///Which events to receive. 'session' sends every session's events except block_event, plus session_created, session_destroyed, session_moved, and tailscale_status_changed. 'all' also sends block_event and the client events, such as client_joined.
     pub event_scope: String,
     ///The session to attach to, if it exists. Otherwise the server attaches the first session. Ignored when attach_session_ids is set.
@@ -581,13 +577,13 @@ pub struct CloseWindowParams {
     pub session_id: String,
     ///The window to close. Leave it out to close the active window. Every block in it closes too.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub window_id: Option<Option<String>>,
+    pub window_id: Option<String>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CreateOutput {
     ///The windows created with the session, in the order requested.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub initial_windows: Option<Option<Vec<CreateOutputInitialWindows>>>,
+    pub initial_windows: Option<Vec<CreateOutputInitialWindows>>,
     ///The new session's ID.
     pub session_id: String,
 }
@@ -604,7 +600,7 @@ pub struct CreateOutputInitialWindows {
 pub struct CreateParams {
     ///Windows to create with the session, in order. The last one becomes the active window. If any of them fails, the server creates no session.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub initial_windows: Option<Option<Vec<CreateParamsInitialWindows>>>,
+    pub initial_windows: Option<Vec<CreateParamsInitialWindows>>,
     ///The session's label, up to 128 characters. Leave it out to let the server choose one, such as quiet-meadow.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -613,7 +609,7 @@ pub struct CreateParams {
 pub struct CreateParamsInitialWindows {
     ///The blocks to create in the window and how to arrange them. Required. Each node holds either block, with a flavor and optional options and label, or split, with direction, before, after, and an optional ratio.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub layout: Option<Option<CreateParamsInitialWindowsLayout>>,
+    pub layout: Option<CreateParamsInitialWindowsLayout>,
     ///The window's label, up to 128 characters. Leave it out for a label made from the window's ID, such as Window 89abcdef.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window_label: Option<String>,
@@ -655,7 +651,7 @@ pub struct DescribeBlockOutputApiMethods(
 pub struct DescribeBlockOutputApiMethodsAdditional {
     ///The actions that call this method, in the order the creator declares them.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub actions: Option<Option<Vec<DescribeBlockOutputApiMethodsAdditionalActions>>>,
+    pub actions: Option<Vec<DescribeBlockOutputApiMethodsAdditionalActions>>,
     ///What the method does.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -706,12 +702,12 @@ pub struct DescribeBlockOutputBlock {
     pub label: String,
     ///The client that owns the block. Left out when the block has no owner.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner: Option<Option<String>>,
+    pub owner: Option<String>,
     ///Whether the block is in a window: 'placed' or 'detached'. Treat a value you don't know as 'detached'.
     pub placement: String,
     ///The window the block is in. Left out when the block is detached.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub window_id: Option<Option<String>>,
+    pub window_id: Option<String>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DescribeBlockParams {
@@ -757,13 +753,13 @@ pub struct DisownBlockOutputBlocks {
     pub block_id: Option<String>,
     ///The client that owns the block. Left out when the block has no owner.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner: Option<Option<String>>,
+    pub owner: Option<String>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DisownBlockParams {
     ///The blocks to give up. Leave it out or empty to give up every block in the session.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_ids: Option<Option<Vec<Option<String>>>>,
+    pub block_ids: Option<Vec<Option<String>>>,
     ///The session to act on.
     pub session_id: String,
 }
@@ -779,9 +775,30 @@ pub struct FloatBlockParams {
     ///The block to float. It must be in its window's layout, not already in a floating layer.
     pub block_id: Option<String>,
     ///Where the new floating layer sits, as [x, y, w, h] fractions of the window's width and height. It must fit inside the window.
-    pub bounds: serde_json::Value,
+    pub bounds: FloatBlockParamsBounds,
     ///The session to act on.
     pub session_id: String,
+}
+///Where the new floating layer sits, as [x, y, w, h] fractions of the window's width and height. It must fit inside the window.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum FloatBlockParamsBounds {
+    Array([f64; 4]),
+    Object(FloatBlockParamsBoundsObject),
+}
+///The same rectangle as an object, the form that earlier clients send.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FloatBlockParamsBoundsObject {
+    ///The height, as a fraction of the window's height.
+    pub h: f64,
+    ///The width, as a fraction of the window's width.
+    pub w: f64,
+    ///The left edge, as a fraction of the window's width.
+    pub x: f64,
+    ///The top edge, as a fraction of the window's height.
+    pub y: f64,
+    #[serde(flatten)]
+    pub additional: std::collections::HashMap<String, serde_json::Value>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FocusBlockOutput {
@@ -913,12 +930,12 @@ pub struct ListBlocksOutputBlocks {
     pub label: String,
     ///The client that owns the block. Left out when the block has no owner.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner: Option<Option<String>>,
+    pub owner: Option<String>,
     ///Whether the block is in a window: 'placed' or 'detached'. Treat a value you don't know as 'detached'.
     pub placement: String,
     ///The window the block is in. Left out when the block is detached.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub window_id: Option<Option<String>>,
+    pub window_id: Option<String>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ListBlocksParams {
@@ -938,7 +955,7 @@ pub struct ListClientsOutputClients {
     pub connected_at: String,
     ///When the server noticed the connection drop, as an RFC 3339 timestamp. Set only while connection_state is lost. A client that doesn't reconnect within 60 seconds leaves the session.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub connection_lost_at: Option<Option<String>>,
+    pub connection_lost_at: Option<String>,
     ///Whether the client has a connection: connected, or lost if it dropped and the client may still reconnect. Treat a missing or unknown value as connected.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub connection_state: Option<String>,
@@ -974,7 +991,7 @@ pub struct ListClientsOutputClientsPrincipal {
     pub display: String,
     ///The client's Unix group ID. Only for kind peer.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub gid: Option<Option<i64>>,
+    pub gid: Option<i64>,
     ///How the server identified the client: 'peer' (Unix socket credentials), 'windows_peer' (named pipe credentials), 'tailscale' (a Tailscale login), or 'anonymous' (not identified). Show a kind you don't know by its name.
     pub kind: String,
     ///The client's Tailscale login name, usually an email address. For display only.
@@ -985,10 +1002,10 @@ pub struct ListClientsOutputClientsPrincipal {
     pub node: Option<String>,
     ///The route the client took to this server, for troubleshooting. Entries include 'tailscale' (built-in Tailscale), 'tailnet' and 'tailnet-serve' (the machine's own Tailscale), and 'login-server' (passed on by a login server).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub path: Option<Option<Vec<String>>>,
+    pub path: Option<Vec<String>>,
     ///The client's process ID when it connected, for kind peer or windows_peer, if known. Process IDs are reused, so use it only for debugging.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub pid: Option<Option<i64>>,
+    pub pid: Option<i64>,
     ///The client's network address. Left out when there is none, such as on a Unix socket.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub remote_addr: Option<String>,
@@ -997,12 +1014,12 @@ pub struct ListClientsOutputClientsPrincipal {
     pub sid: Option<String>,
     ///The Tailscale tags of the client's device. Any tag means the client is a machine, such as a CI runner, not a person.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Option<Vec<String>>>,
+    pub tags: Option<Vec<String>>,
     ///How the client first reached Rex: 'unix', 'named_pipe', 'tcp', or 'tailscale'. A login server passes it on unchanged.
     pub transport: String,
     ///The client's Unix user ID. Only for kind peer.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub uid: Option<Option<i64>>,
+    pub uid: Option<i64>,
     ///The Tailscale user ID that owns the client's device. Only for kind tailscale. Check tags before treating it as a person.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_id: Option<String>,
@@ -1037,7 +1054,7 @@ pub struct LowerLayerParams {
     pub layer_id: Option<String>,
     ///Another floating layer in the same window to place it just below. Leave it out to move it behind every other floating layer.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub relative_layer_id: Option<Option<String>>,
+    pub relative_layer_id: Option<String>,
     ///The session to act on.
     pub session_id: String,
 }
@@ -1047,7 +1064,7 @@ pub struct MoveBlockOutput {
     pub created_split_id: Option<String>,
     ///The split that held the block before the move, which the move removed. Left out if no split was removed, such as for a detached block.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub removed_split_id: Option<Option<String>>,
+    pub removed_split_id: Option<String>,
     ///The session's revision after this call.
     pub revision: i64,
 }
@@ -1059,7 +1076,7 @@ pub struct MoveBlockParams {
     pub block_id: Option<String>,
     ///How to divide the anchor's space: 'horizontal' for side by side or 'vertical' for one above the other. Defaults to horizontal.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub direction: Option<Option<MoveBlockParamsDirection>>,
+    pub direction: Option<MoveBlockParamsDirection>,
     ///The fraction of the space that the before part gets, greater than 0 and less than 1. Defaults to 0.5.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ratio: Option<f64>,
@@ -1067,7 +1084,7 @@ pub struct MoveBlockParams {
     pub session_id: String,
     ///Where the moved block goes: 'before' for the left or top part, or 'after' for the right or bottom part. Defaults to after.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub side: Option<Option<MoveBlockParamsSide>>,
+    pub side: Option<MoveBlockParamsSide>,
 }
 ///How to divide the anchor's space: 'horizontal' for side by side or 'vertical' for one above the other. Defaults to horizontal.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -1091,7 +1108,7 @@ pub struct MoveOutput {}
 pub struct MoveParams {
     ///The session to place it just before. Leave it out to move the session to the end.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub before_session_id: Option<Option<String>>,
+    pub before_session_id: Option<String>,
     ///The session to move.
     pub session_id: String,
 }
@@ -1104,7 +1121,7 @@ pub struct MoveWindowOutput {
 pub struct MoveWindowParams {
     ///The window to place it just before. Leave it out to move the window to the end.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub before_window_id: Option<Option<String>>,
+    pub before_window_id: Option<String>,
     ///The session to act on.
     pub session_id: String,
     ///The window to move.
@@ -1142,7 +1159,7 @@ pub struct NewLayerOutput {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NewLayerParams {
     ///Where the new floating layer sits, as [x, y, w, h] fractions of the window's width and height. It must fit inside the window.
-    pub bounds: serde_json::Value,
+    pub bounds: NewLayerParamsBounds,
     ///Whether to make the window active and focus the first new block. Defaults to false.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub focus: Option<bool>,
@@ -1152,7 +1169,28 @@ pub struct NewLayerParams {
     pub session_id: String,
     ///The window to add the floating layer to. Leave it out to use the active window.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub window_id: Option<Option<String>>,
+    pub window_id: Option<String>,
+}
+///Where the new floating layer sits, as [x, y, w, h] fractions of the window's width and height. It must fit inside the window.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum NewLayerParamsBounds {
+    Array([f64; 4]),
+    Object(NewLayerParamsBoundsObject),
+}
+///The same rectangle as an object, the form that earlier clients send.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct NewLayerParamsBoundsObject {
+    ///The height, as a fraction of the window's height.
+    pub h: f64,
+    ///The width, as a fraction of the window's width.
+    pub w: f64,
+    ///The left edge, as a fraction of the window's width.
+    pub x: f64,
+    ///The top edge, as a fraction of the window's height.
+    pub y: f64,
+    #[serde(flatten)]
+    pub additional: std::collections::HashMap<String, serde_json::Value>,
 }
 ///The blocks to create in the floating layer and how to arrange them. Each node holds either block, with a flavor and optional options and label, or split, with direction, before, after, and an optional ratio.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -1174,7 +1212,7 @@ pub struct NewSplitOutput {
 pub struct NewSplitParams {
     ///The block or split whose space to split. A block ID splits that one block. A split ID puts the new blocks beside that split and everything under it. Leave it out to split the focused block of window_id, or of the active window. Don't send it with window_id.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub anchor_id: Option<Option<String>>,
+    pub anchor_id: Option<String>,
     ///How to divide the anchor's space: 'horizontal' for side by side or 'vertical' for one above the other.
     pub direction: NewSplitParamsDirection,
     ///Whether to make the anchor's window active and focus the first new block. Defaults to false.
@@ -1191,7 +1229,7 @@ pub struct NewSplitParams {
     pub side: NewSplitParamsSide,
     ///The window whose focused block to split. Send it only when anchor_id is left out.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub window_id: Option<Option<String>>,
+    pub window_id: Option<String>,
 }
 ///How to divide the anchor's space: 'horizontal' for side by side or 'vertical' for one above the other.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -1227,10 +1265,10 @@ pub struct NewWindowOutput {
 pub struct NewWindowParams {
     ///Whether to make the new window the active window. Defaults to true. A session with no active window always makes the new one active.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub focus: Option<Option<bool>>,
+    pub focus: Option<bool>,
     ///The blocks to create in the window and how to arrange them. Required. Each node holds either block, with a flavor and optional options and label, or split, with direction, before, after, and an optional ratio.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub layout: Option<Option<NewWindowParamsLayout>>,
+    pub layout: Option<NewWindowParamsLayout>,
     ///The session to act on.
     pub session_id: String,
     ///The window's label, up to 128 characters. Leave it out for a label made from the window's ID, such as Window 89abcdef.
@@ -1253,13 +1291,13 @@ pub struct OwnBlockOutputBlocks {
     pub block_id: Option<String>,
     ///The client that owns the block. Left out when the block has no owner.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner: Option<Option<String>>,
+    pub owner: Option<String>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct OwnBlockParams {
     ///The blocks to claim. Leave it out or empty to claim every block in the session.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_ids: Option<Option<Vec<Option<String>>>>,
+    pub block_ids: Option<Vec<Option<String>>>,
     ///How to claim them. 'take' makes the calling client the owner right away. 'request' makes it the owner only of blocks that have none, and it may get the rest when their owner gives them up or leaves. Defaults to take.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<String>,
@@ -1277,7 +1315,7 @@ pub struct RaiseLayerParams {
     pub layer_id: Option<String>,
     ///Another floating layer in the same window to place it just above. Leave it out to move it in front of every other floating layer.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub relative_layer_id: Option<Option<String>>,
+    pub relative_layer_id: Option<String>,
     ///The session to act on.
     pub session_id: String,
 }
@@ -1289,11 +1327,32 @@ pub struct ResizeLayerOutput {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ResizeLayerParams {
     ///The layer's new position and size, as [x, y, w, h] fractions of the window's width and height. It must fit inside the window.
-    pub bounds: serde_json::Value,
+    pub bounds: ResizeLayerParamsBounds,
     ///The floating layer to move or resize.
     pub layer_id: Option<String>,
     ///The session to act on.
     pub session_id: String,
+}
+///The layer's new position and size, as [x, y, w, h] fractions of the window's width and height. It must fit inside the window.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum ResizeLayerParamsBounds {
+    Array([f64; 4]),
+    Object(ResizeLayerParamsBoundsObject),
+}
+///The same rectangle as an object, the form that earlier clients send.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ResizeLayerParamsBoundsObject {
+    ///The height, as a fraction of the window's height.
+    pub h: f64,
+    ///The width, as a fraction of the window's width.
+    pub w: f64,
+    ///The left edge, as a fraction of the window's width.
+    pub x: f64,
+    ///The top edge, as a fraction of the window's height.
+    pub y: f64,
+    #[serde(flatten)]
+    pub additional: std::collections::HashMap<String, serde_json::Value>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ResizePaneOutput {
@@ -1330,7 +1389,7 @@ pub struct SetBlockLabelOutput {
 pub struct SetBlockLabelParams {
     ///The block to relabel. Required.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_id: Option<Option<String>>,
+    pub block_id: Option<String>,
     ///The new label, up to 128 characters. An empty or missing label restores a default made from the block's ID.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -1400,7 +1459,7 @@ pub struct SwapBlocksParams {
 pub struct ViewOutput {
     ///The window the session shows. Left out when the session has no windows.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub active_window_id: Option<Option<String>>,
+    pub active_window_id: Option<String>,
     ///The session's label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -1410,13 +1469,13 @@ pub struct ViewOutput {
     pub session_id: Option<String>,
     ///The session's windows, in order. Rex.app shows them as tabs in this order.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub windows: Option<Option<Vec<ViewOutputWindows>>>,
+    pub windows: Option<Vec<ViewOutputWindows>>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ViewOutputWindows {
     ///The window's focused block, which receives typing while the window is active. Left out if the window has none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub focused_block_id: Option<Option<String>>,
+    pub focused_block_id: Option<String>,
     ///The window's label.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -1426,14 +1485,14 @@ pub struct ViewOutputWindows {
     pub window_id: Option<String>,
     ///The block zoomed to fill the window, if any. Layouts keep their normal sizes, so draw this block over the whole window.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub zoomed_block_id: Option<Option<String>>,
+    pub zoomed_block_id: Option<String>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ViewOutputWindowsLayers {
     ///The blocks in the layer, in layout order. The layout field says where each one sits.
     pub blocks: Option<Vec<ViewOutputWindowsLayersBlocks>>,
     ///Where the layer sits, as [x, y, w, h] fractions of the window's width and height.
-    pub bounds: Vec<f64>,
+    pub bounds: [f64; 4],
     ///How the layer is placed: 'tiled' for the layer that fills the window, or 'floating' for a floating layer. Draw a kind you don't know as 'floating'.
     pub kind: String,
     ///The layer's ID.
@@ -1462,19 +1521,19 @@ pub struct ViewOutputWindowsLayersBlocks {
     pub label: Option<String>,
     ///The client that owns the block. Left out when the block has no owner.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner: Option<Option<String>>,
+    pub owner: Option<String>,
 }
 ///How the layer divides its space between blocks, as a tree of splits. Null when the layer is empty.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ViewOutputWindowsLayersLayout {
     ///The block at this node. Set only when split isn't.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_id: Option<Option<String>>,
+    pub block_id: Option<String>,
     ///Where this node sits, as [x, y, w, h] fractions of the window's width and height.
-    pub rect: Vec<f64>,
+    pub rect: [f64; 4],
     ///How this node divides in two. Set only when block_id isn't.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub split: Option<Option<ViewOutputWindowsLayersLayoutSplit>>,
+    pub split: Option<ViewOutputWindowsLayersLayoutSplit>,
     #[serde(flatten)]
     pub additional: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -1520,15 +1579,15 @@ pub struct ZoomBlockOutput {
 pub struct ZoomBlockParams {
     ///The block to zoom. It takes focus, and its window becomes active. Leave it out to use the focused block of window_id, or of the active window.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_id: Option<Option<String>>,
+    pub block_id: Option<String>,
     ///The session to act on.
     pub session_id: String,
     ///A window whose focused block to zoom. The active window doesn't change. Send it only when block_id is left out.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub window_id: Option<Option<String>>,
+    pub window_id: Option<String>,
     ///Set true to zoom or false to restore the layout. Leave it out to switch between the two.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub zoom: Option<Option<bool>>,
+    pub zoom: Option<bool>,
 }
 ///Attach to a session: start receiving its events and get its current view.
 pub async fn attach(

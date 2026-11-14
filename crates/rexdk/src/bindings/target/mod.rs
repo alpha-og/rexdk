@@ -46,14 +46,14 @@ pub struct CompleteOutputCompletionsTarget {
 pub struct CompleteParams {
     ///Where the caller is. Only session_id is used: without scope.session, windows and blocks come from that session.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub context: Option<Option<CompleteParamsContext>>,
+    pub context: Option<CompleteParamsContext>,
     ///What to complete: session, window, block, or client, with the same rules as in target.resolve. Completions come back in this order.
     pub kinds: Option<Vec<String>>,
     ///The text typed so far. It matches the start of labels (ignoring case), window positions, and short IDs. An empty prefix matches everything.
     pub prefix: String,
     ///Limits completion to one session, or block completion to one window, as in target.resolve.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub scope: Option<Option<CompleteParamsScope>>,
+    pub scope: Option<CompleteParamsScope>,
 }
 ///Where the caller is. Only session_id is used: without scope.session, windows and blocks come from that session.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -87,7 +87,7 @@ pub struct ResolveOutput {
 pub struct ResolveOutputResults {
     ///When status is ambiguous, the choices for a person to pick from. Check each one's kind.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub candidates: Option<Option<Vec<ResolveOutputResultsCandidates>>>,
+    pub candidates: Option<Vec<ResolveOutputResultsCandidates>>,
     ///The query this result answers, exactly as sent.
     pub query: String,
     ///Why the query didn't resolve, for showing to a person. May be empty.
@@ -97,7 +97,7 @@ pub struct ResolveOutputResults {
     pub status: String,
     ///What the query matched. Set only when status is resolved.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub target: Option<Option<ResolveOutputResultsTarget>>,
+    pub target: Option<ResolveOutputResultsTarget>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ResolveOutputResultsCandidates {
@@ -156,14 +156,14 @@ pub struct ResolveOutputResultsTarget {
 pub struct ResolveParams {
     ///Where the caller is, such as the terminal a script runs in. IDs in it that no longer exist are ignored.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub context: Option<Option<ResolveParamsContext>>,
+    pub context: Option<ResolveParamsContext>,
     ///What each query may name: session, window, block, or client. List each kind once, and list client only on its own.
     pub kinds: Option<Vec<String>>,
     ///The names to look up. Each is a full ID, a label, a window position, the end of an ID, or an empty string for the default.
     pub queries: Option<Vec<String>>,
     ///Limits the search to one session, or a block search to one window. Not allowed when kinds includes session.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub scope: Option<Option<ResolveParamsScope>>,
+    pub scope: Option<ResolveParamsScope>,
 }
 ///Where the caller is, such as the terminal a script runs in. IDs in it that no longer exist are ignored.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

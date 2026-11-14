@@ -14,7 +14,7 @@ pub struct ListOutputCreators {
     pub description: String,
     ///Optional features the creator supports. Ignore names you don't know. No names are defined yet.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub features: Option<Option<Vec<String>>>,
+    pub features: Option<Vec<String>>,
     ///The flavors this creator offers.
     pub flavors: Option<Vec<ListOutputCreatorsFlavors>>,
     ///Identifies the machine and account its blocks run as. If it equals your local server's host_id, its blocks see the same files you do.
@@ -49,7 +49,7 @@ pub struct ListOutputCreatorsApiMethods(
 pub struct ListOutputCreatorsApiMethodsAdditional {
     ///The actions that call this method, in the order the creator declares them.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub actions: Option<Option<Vec<ListOutputCreatorsApiMethodsAdditionalActions>>>,
+    pub actions: Option<Vec<ListOutputCreatorsApiMethodsAdditionalActions>>,
     ///What the method does.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,

@@ -38,7 +38,7 @@ pub struct ActionParams {
     pub server: Option<String>,
     ///Other servers this client is connected to, which a configuration file action can call with rex.server(name). Don't list the server you're sending this to.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub servers: Option<Option<Vec<ActionParamsServers>>>,
+    pub servers: Option<Vec<ActionParamsServers>>,
     ///The session the action applies to. Required for a block action. A configuration file action may leave it out, and then has no default session.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
@@ -54,7 +54,7 @@ pub struct ActionParamsServers {
 pub struct InspectOutput {
     ///The actions the client declared in its latest client.keymap request that listed any. Left out if it declared none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub actions: Option<Option<Vec<InspectOutputActions>>>,
+    pub actions: Option<Vec<InspectOutputActions>>,
     ///The client, as client.list describes it.
     pub client: InspectOutputClient,
 }
@@ -96,7 +96,7 @@ pub struct InspectOutputClient {
     pub connected_at: String,
     ///When the server noticed the connection drop, as an RFC 3339 timestamp. Set only while connection_state is lost.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub connection_lost_at: Option<Option<String>>,
+    pub connection_lost_at: Option<String>,
     ///Whether the client has a connection: connected, or lost if it dropped and the client may still reconnect. Treat a missing or unknown value as connected.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub connection_state: Option<String>,
@@ -107,7 +107,7 @@ pub struct InspectOutputClient {
     pub principal: InspectOutputClientPrincipal,
     ///The sessions the client attached to with session.attach or session.bootstrap, sorted by ID. Left out if there are none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub session_ids: Option<Option<Vec<String>>>,
+    pub session_ids: Option<Vec<String>>,
 }
 ///What the client says about itself, such as its name and version, for showing to people. Left out if it said nothing.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -135,7 +135,7 @@ pub struct InspectOutputClientPrincipal {
     pub display: String,
     ///The client's Unix group ID. Only for kind peer.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub gid: Option<Option<i64>>,
+    pub gid: Option<i64>,
     ///How the server identified the client: 'peer' (Unix socket credentials), 'windows_peer' (named pipe credentials), 'tailscale' (a Tailscale login), or 'anonymous' (not identified). Show a kind you don't know by its name.
     pub kind: String,
     ///The client's Tailscale login name, usually an email address. For display only.
@@ -146,10 +146,10 @@ pub struct InspectOutputClientPrincipal {
     pub node: Option<String>,
     ///The route the client took to this server, for troubleshooting. Entries include 'tailscale' (built-in Tailscale), 'tailnet' and 'tailnet-serve' (the machine's own Tailscale), and 'login-server' (passed on by a login server).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub path: Option<Option<Vec<String>>>,
+    pub path: Option<Vec<String>>,
     ///The client's process ID when it connected, for kind peer or windows_peer, if known. Process IDs are reused, so use it only for debugging.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub pid: Option<Option<i64>>,
+    pub pid: Option<i64>,
     ///The client's network address. Left out when there is none, such as on a Unix socket.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub remote_addr: Option<String>,
@@ -158,12 +158,12 @@ pub struct InspectOutputClientPrincipal {
     pub sid: Option<String>,
     ///The Tailscale tags of the client's device. Any tag means the client is a machine, such as a CI runner, not a person.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Option<Vec<String>>>,
+    pub tags: Option<Vec<String>>,
     ///How the client first reached Rex: 'unix', 'named_pipe', 'tcp', or 'tailscale'. A login server passes it on unchanged.
     pub transport: String,
     ///The client's Unix user ID. Only for kind peer.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub uid: Option<Option<i64>>,
+    pub uid: Option<i64>,
     ///The Tailscale user ID that owns the client's device. Only for kind tailscale. Check tags before treating it as a person.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_id: Option<String>,
@@ -187,7 +187,7 @@ pub struct KeyParams {
     pub key: KeyParamsKey,
     ///The keys pressed before key when key ends a key sequence, in order. For ctrl+b then x, send x as key and ctrl+b here.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prefix: Option<Option<Vec<String>>>,
+    pub prefix: Option<Vec<String>>,
     ///The session the key is typed in.
     pub session_id: String,
 }
@@ -579,7 +579,7 @@ pub enum KeyParamsKeyKey {
 pub struct KeymapOutput {
     ///The server's actions that keys can be bound to: the configuration file's, then each creator's, by creator name. Left out when there are none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub actions: Option<Option<Vec<KeymapOutputActions>>>,
+    pub actions: Option<Vec<KeymapOutputActions>>,
     ///The resolved bindings, in the order to try them. When several share a key, run the first one whose action is available.
     pub bindings: Option<Vec<KeymapOutputBindings>>,
     ///The configuration file the keymap came from. Present even when the file doesn't exist, so you can tell the user where to create it.
@@ -588,7 +588,7 @@ pub struct KeymapOutput {
     pub diagnostics: Option<Vec<KeymapOutputDiagnostics>>,
     ///Every mode in the keymap, sorted by name. Left out when there are none. The client decides which mode is active.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub modes: Option<Option<Vec<KeymapOutputModes>>>,
+    pub modes: Option<Vec<KeymapOutputModes>>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KeymapOutputActions {
@@ -672,7 +672,7 @@ pub struct KeymapOutputDiagnostics {
 pub struct KeymapOutputModes {
     ///Keys that must not reach the bindings outside the mode while it's active. If the mode also binds one, that binding still runs. Each is spelled like a binding's keys.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub blocked: Option<Option<Vec<Option<Vec<String>>>>>,
+    pub blocked: Option<Vec<Option<Vec<String>>>>,
     ///True if keys the mode doesn't bind are ignored while it's active. If false, they do what they do outside the mode.
     pub exclusive: bool,
     ///The mode's name, such as resize. Its bindings have it as their mode, and client.mode.enter takes it as its name argument.
@@ -682,13 +682,13 @@ pub struct KeymapOutputModes {
 pub struct KeymapParams {
     ///The actions the client performs itself. Leave it out to skip the checks for unknown actions and wrong arguments. The server keeps the list for client.inspect and client.perform.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub actions: Option<Option<Vec<KeymapParamsActions>>>,
+    pub actions: Option<Vec<KeymapParamsActions>>,
     ///The client's built-in layers, lowest first. They sit beneath the configuration file. Problems found only in them aren't reported, because the user can't edit them.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub defaults: Option<Option<Vec<KeymapParamsDefaults>>>,
+    pub defaults: Option<Vec<KeymapParamsDefaults>>,
     ///Layers of shortcuts a person recorded in the client, lowest first. They sit above the configuration file and this client's scripts. Problems in them come back as warnings.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub overrides: Option<Option<Vec<KeymapParamsOverrides>>>,
+    pub overrides: Option<Vec<KeymapParamsOverrides>>,
     ///Which of the server's actions the reply lists: all (the default), configured (only the configuration file's), or none. An unknown value means all.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub server_actions: Option<String>,
@@ -726,12 +726,12 @@ pub struct KeymapParamsActions {
 pub struct KeymapParamsDefaults {
     ///What the layer binds, in the order it bound them. A later binding sits above an earlier one on the same key.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bindings: Option<Option<Vec<KeymapParamsDefaultsBindings>>>,
+    pub bindings: Option<Vec<KeymapParamsDefaultsBindings>>,
     ///The layer's name, such as default or settings, which its bindings report as their source. Unique in the request, with no colon.
     pub name: String,
     ///What the layer takes off the layers beneath it. Removals never touch the layer's own bindings.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub removals: Option<Option<Vec<KeymapParamsDefaultsRemovals>>>,
+    pub removals: Option<Vec<KeymapParamsDefaultsRemovals>>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KeymapParamsDefaultsBindings {
@@ -764,12 +764,12 @@ pub struct KeymapParamsDefaultsRemovals {
 pub struct KeymapParamsOverrides {
     ///What the layer binds, in the order it bound them. A later binding sits above an earlier one on the same key.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bindings: Option<Option<Vec<KeymapParamsOverridesBindings>>>,
+    pub bindings: Option<Vec<KeymapParamsOverridesBindings>>,
     ///The layer's name, such as default or settings, which its bindings report as their source. Unique in the request, with no colon.
     pub name: String,
     ///What the layer takes off the layers beneath it. Removals never touch the layer's own bindings.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub removals: Option<Option<Vec<KeymapParamsOverridesRemovals>>>,
+    pub removals: Option<Vec<KeymapParamsOverridesRemovals>>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KeymapParamsOverridesBindings {
@@ -811,7 +811,7 @@ pub struct ListOutputClients {
     pub connected_at: String,
     ///When the server noticed the connection drop, as an RFC 3339 timestamp. Set only while connection_state is lost.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub connection_lost_at: Option<Option<String>>,
+    pub connection_lost_at: Option<String>,
     ///Whether the client has a connection: connected, or lost if it dropped and the client may still reconnect. Treat a missing or unknown value as connected.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub connection_state: Option<String>,
@@ -822,7 +822,7 @@ pub struct ListOutputClients {
     pub principal: ListOutputClientsPrincipal,
     ///The sessions the client attached to with session.attach or session.bootstrap, sorted by ID. Left out if there are none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub session_ids: Option<Option<Vec<String>>>,
+    pub session_ids: Option<Vec<String>>,
 }
 ///What the client says about itself, such as its name and version, for showing to people. Left out if it said nothing.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -850,7 +850,7 @@ pub struct ListOutputClientsPrincipal {
     pub display: String,
     ///The client's Unix group ID. Only for kind peer.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub gid: Option<Option<i64>>,
+    pub gid: Option<i64>,
     ///How the server identified the client: 'peer' (Unix socket credentials), 'windows_peer' (named pipe credentials), 'tailscale' (a Tailscale login), or 'anonymous' (not identified). Show a kind you don't know by its name.
     pub kind: String,
     ///The client's Tailscale login name, usually an email address. For display only.
@@ -861,10 +861,10 @@ pub struct ListOutputClientsPrincipal {
     pub node: Option<String>,
     ///The route the client took to this server, for troubleshooting. Entries include 'tailscale' (built-in Tailscale), 'tailnet' and 'tailnet-serve' (the machine's own Tailscale), and 'login-server' (passed on by a login server).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub path: Option<Option<Vec<String>>>,
+    pub path: Option<Vec<String>>,
     ///The client's process ID when it connected, for kind peer or windows_peer, if known. Process IDs are reused, so use it only for debugging.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub pid: Option<Option<i64>>,
+    pub pid: Option<i64>,
     ///The client's network address. Left out when there is none, such as on a Unix socket.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub remote_addr: Option<String>,
@@ -873,12 +873,12 @@ pub struct ListOutputClientsPrincipal {
     pub sid: Option<String>,
     ///The Tailscale tags of the client's device. Any tag means the client is a machine, such as a CI runner, not a person.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Option<Vec<String>>>,
+    pub tags: Option<Vec<String>>,
     ///How the client first reached Rex: 'unix', 'named_pipe', 'tcp', or 'tailscale'. A login server passes it on unchanged.
     pub transport: String,
     ///The client's Unix user ID. Only for kind peer.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub uid: Option<Option<i64>>,
+    pub uid: Option<i64>,
     ///The Tailscale user ID that owns the client's device. Only for kind tailscale. Check tags before treating it as a person.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_id: Option<String>,
@@ -887,7 +887,7 @@ pub struct ListOutputClientsPrincipal {
 pub struct ListParams {
     ///List only the clients of these kinds, such as app. A client that didn't report a kind matches none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub kinds: Option<Option<Vec<String>>>,
+    pub kinds: Option<Vec<String>>,
     ///List only the clients attached to this session with session.attach or session.bootstrap.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
@@ -930,7 +930,7 @@ pub struct ReplyParams {
     pub call_id: String,
     ///Why the call failed or the action wasn't performed. Set this or result, not both.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<Option<ReplyParamsError>>,
+    pub error: Option<ReplyParamsError>,
     ///The call's result, or what the action returned. Use null if there is none. Set this or error, not both.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result: Option<serde_json::Value>,
@@ -957,10 +957,10 @@ pub struct SetScriptOutput {
     pub all_keys: Option<bool>,
     ///The single keys the scripts bind to Lua functions. A key sent alone reaches the scripts only if it's listed here and pressed or repeating. Key sequences aren't listed.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub bindings: Option<Option<Vec<String>>>,
+    pub bindings: Option<Vec<String>>,
     ///Problems in the scripts, written to show the user. The server skips each line it can't carry out and loads the rest.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub diagnostics: Option<Option<Vec<SetScriptOutputDiagnostics>>>,
+    pub diagnostics: Option<Vec<SetScriptOutputDiagnostics>>,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SetScriptOutputDiagnostics {

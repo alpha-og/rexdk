@@ -50,7 +50,7 @@ pub struct StatusOutput {
     pub instance_id: String,
     ///Each endpoint the server accepts connections on, primary first. Servers older than API revision 12 leave it out. Doesn't include built-in Tailscale, which the tailscale member describes.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub listeners: Option<Option<Vec<StatusOutputListeners>>>,
+    pub listeners: Option<Vec<StatusOutputListeners>>,
     ///The server's process ID.
     pub pid: i64,
     ///How many sessions the server has.
@@ -73,7 +73,7 @@ pub struct StatusOutputConfig {
 pub struct StatusOutputListeners {
     ///The addresses the listener is bound to, such as a socket path or 127.0.0.1:54321. They show the port that an endpoint like 127.0.0.1:0 got. Left out when the server can't tell.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub addresses: Option<Option<Vec<String>>>,
+    pub addresses: Option<Vec<String>>,
     ///Which callers the listener lets in: 'peer_credentials', 'anonymous', 'tailscale_owner', 'tailscale_identified', or 'login_server'. Left out when the server can't tell. Show a value you don't know as it is.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub admission: Option<String>,
@@ -112,7 +112,7 @@ pub struct StatusOutputTailscale {
     pub state: String,
     ///The Tailscale tags the device has, such as tag:rex. A tagged device has no owner. Left out when it has none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Option<Vec<String>>>,
+    pub tags: Option<Vec<String>>,
     ///The tailnet's display name, or its domain if it has none. Left out until known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tailnet_name: Option<String>,
@@ -152,7 +152,7 @@ pub struct VersionOutput {
     pub api_revision: Option<i64>,
     ///When the server was built, as an RFC 3339 timestamp. Most builds record the time of their Git commit. Left out when unknown.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub built_at: Option<Option<String>>,
+    pub built_at: Option<String>,
     ///The Git commit the server was built from. Left out when unknown.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub commit: Option<String>,
@@ -180,7 +180,7 @@ pub struct WhoamiOutputPrincipal {
     pub display: String,
     ///The client's Unix group ID. Only for kind peer.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub gid: Option<Option<i64>>,
+    pub gid: Option<i64>,
     ///How the server identified the client: 'peer' (Unix socket credentials), 'windows_peer' (named pipe credentials), 'tailscale' (a Tailscale login), or 'anonymous' (not identified). Show a kind you don't know by its name.
     pub kind: String,
     ///The client's Tailscale login name, usually an email address. For display only.
@@ -191,10 +191,10 @@ pub struct WhoamiOutputPrincipal {
     pub node: Option<String>,
     ///The route the client took to this server, for troubleshooting. Entries include 'tailscale' (built-in Tailscale), 'tailnet' and 'tailnet-serve' (the machine's own Tailscale), and 'login-server' (passed on by a login server).
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub path: Option<Option<Vec<String>>>,
+    pub path: Option<Vec<String>>,
     ///The client's process ID when it connected, for kind peer or windows_peer, if known. Process IDs are reused, so use it only for debugging.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub pid: Option<Option<i64>>,
+    pub pid: Option<i64>,
     ///The client's network address. Left out when there is none, such as on a Unix socket.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub remote_addr: Option<String>,
@@ -203,12 +203,12 @@ pub struct WhoamiOutputPrincipal {
     pub sid: Option<String>,
     ///The Tailscale tags of the client's device. Any tag means the client is a machine, such as a CI runner, not a person.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Option<Vec<String>>>,
+    pub tags: Option<Vec<String>>,
     ///How the client first reached Rex: 'unix', 'named_pipe', 'tcp', or 'tailscale'. A login server passes it on unchanged.
     pub transport: String,
     ///The client's Unix user ID. Only for kind peer.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub uid: Option<Option<i64>>,
+    pub uid: Option<i64>,
     ///The Tailscale user ID that owns the client's device. Only for kind tailscale. Check tags before treating it as a person.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_id: Option<String>,

@@ -33,7 +33,7 @@ pub struct DisableOutputTailscale {
     pub state: String,
     ///The Tailscale tags the device has, such as tag:rex. A tagged device has no owner. Left out when it has none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Option<Vec<String>>>,
+    pub tags: Option<Vec<String>>,
     ///The tailnet's display name, or its domain if it has none. Left out until known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tailnet_name: Option<String>,
@@ -87,7 +87,7 @@ pub struct EnableOutputTailscale {
     pub state: String,
     ///The Tailscale tags the device has, such as tag:rex. A tagged device has no owner. Left out when it has none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Option<Vec<String>>>,
+    pub tags: Option<Vec<String>>,
     ///The tailnet's display name, or its domain if it has none. Left out until known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tailnet_name: Option<String>,
@@ -111,7 +111,7 @@ pub struct EnableOutputTailscaleHttps {
 pub struct EnableParams {
     ///Tailscale tags, such as tag:rex, for the device to sign in with. Used only when this call starts the device. Needs allow_tailnet_members set to true.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub advertise_tags: Option<Option<Vec<String>>>,
+    pub advertise_tags: Option<Vec<String>>,
     ///True lets in anyone your tailnet's access rules allow. False lets in only the Tailscale user who signed the device in. Applies on every call, even when the device is already on.
     pub allow_tailnet_members: bool,
     ///A Tailscale auth key that signs the device in without a browser. Used only when this call starts the device. Never logged or saved.
@@ -156,7 +156,7 @@ pub struct LoginOutputTailscale {
     pub state: String,
     ///The Tailscale tags the device has, such as tag:rex. A tagged device has no owner. Left out when it has none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Option<Vec<String>>>,
+    pub tags: Option<Vec<String>>,
     ///The tailnet's display name, or its domain if it has none. Left out until known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tailnet_name: Option<String>,
@@ -210,7 +210,7 @@ pub struct LogoutOutputTailscale {
     pub state: String,
     ///The Tailscale tags the device has, such as tag:rex. A tagged device has no owner. Left out when it has none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Option<Vec<String>>>,
+    pub tags: Option<Vec<String>>,
     ///The tailnet's display name, or its domain if it has none. Left out until known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tailnet_name: Option<String>,
@@ -264,7 +264,7 @@ pub struct RenameOutputTailscale {
     pub state: String,
     ///The Tailscale tags the device has, such as tag:rex. A tagged device has no owner. Left out when it has none.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Option<Vec<String>>>,
+    pub tags: Option<Vec<String>>,
     ///The tailnet's display name, or its domain if it has none. Left out until known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tailnet_name: Option<String>,

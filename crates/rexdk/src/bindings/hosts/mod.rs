@@ -5,7 +5,7 @@ use crate::runtime::{Client, Error};
 pub struct ListOutput {
     ///Warnings about the hosts declared in the configuration file. Left out when there are none. The hash doesn't cover them.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub diagnostics: Option<Option<Vec<ListOutputDiagnostics>>>,
+    pub diagnostics: Option<Vec<ListOutputDiagnostics>>,
     ///Identifies this version of the list. hosts.put, hosts.remove, and the hosts_changed event report the same hash for the same list.
     pub hash: String,
     ///Every host in the list, sorted by label, ignoring case, then by id. An empty list when there are no hosts.
