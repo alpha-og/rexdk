@@ -36,9 +36,12 @@ impl Generator {
         let ty = match &schema.schema_kind {
             SchemaKind::Array {
                 items,
-                min_items: _,
-                max_items: _,
-            } => Self::generate_type(registry, items, name).map(Self::generate_array_type)?,
+                min_items,
+                max_items,
+            } => {
+                let inner = Self::generate_type(registry, items, name)?;
+                Self::generate_array_type(inner, *min_items, *max_items)
+            }
             SchemaKind::Enum { base, values } => {
                 Self::generate_enum_type(registry, name, schema.description.as_ref(), base, values)?
             }
@@ -114,9 +117,21 @@ impl Generator {
         }
     }
 
-    fn generate_array_type(inner_type: TokenStream) -> TokenStream {
-        quote! {
-            Vec<#inner_type>
+    fn generate_array_type(
+        inner_type: TokenStream,
+        min_items: Option<u64>,
+        max_items: Option<u64>,
+    ) -> TokenStream {
+        match (min_items, max_items) {
+            (Some(min), Some(max)) if min == max => {
+                let len = proc_macro2::Literal::u64_unsuffixed(min);
+                quote! {
+                    [#inner_type; #len]
+                }
+            }
+            _ => quote! {
+                Vec<#inner_type>
+            },
         }
     }
 
